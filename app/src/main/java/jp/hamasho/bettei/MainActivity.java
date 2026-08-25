@@ -1,25 +1,21 @@
 package jp.hamasho.bettei;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
@@ -36,15 +32,12 @@ public class MainActivity extends Activity {
     private static final int TEXT = Color.rgb(246, 241, 231);
     private static final int MUTED = Color.rgb(188, 175, 154);
     private static final int DIVIDER = Color.rgb(79, 67, 53);
-    private static final int DANGER = Color.rgb(133, 55, 48);
 
     private static final String MEMBER_ID = "HMB-000001";
-    private static final String STAFF_PIN = "1188";
 
     private LinearLayout content;
-    private Button homeNav, memberNav, couponNav, staffNav;
+    private Button homeNav, memberNav, couponNav, storeNav;
     private SharedPreferences prefs;
-    private boolean staffUnlocked = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,7 +56,6 @@ public class MainActivity extends Activity {
                     .putInt("available", 428)
                     .putInt("cumulative", 8750)
                     .putBoolean("coupon_used", false)
-                    .putString("last_action", "試作データで開始")
                     .apply();
         }
     }
@@ -89,6 +81,7 @@ public class MainActivity extends Activity {
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(16), dp(16), dp(16), dp(28));
@@ -103,17 +96,17 @@ public class MainActivity extends Activity {
         homeNav = navButton("ホーム");
         memberNav = navButton("会員証");
         couponNav = navButton("クーポン");
-        staffNav = navButton("スタッフ");
+        storeNav = navButton("店舗");
 
         nav.addView(homeNav, weighted());
         nav.addView(memberNav, weighted());
         nav.addView(couponNav, weighted());
-        nav.addView(staffNav, weighted());
+        nav.addView(storeNav, weighted());
 
         homeNav.setOnClickListener(v -> showHome());
         memberNav.setOnClickListener(v -> showMember());
         couponNav.setOnClickListener(v -> showCoupon());
-        staffNav.setOnClickListener(v -> showStaff());
+        storeNav.setOnClickListener(v -> showStore());
 
         root.addView(nav, matchWrap());
         setContentView(root);
@@ -158,8 +151,8 @@ public class MainActivity extends Activity {
         coupon.setPadding(dp(18), dp(16), dp(18), dp(16));
         coupon.addView(text(currentMonth() + "月限定クーポン", 13, GOLD, true), matchWrap());
         coupon.addView(text(couponText(rank.name), 20, TEXT, true), topMargin(dp(7)));
-        String state = prefs.getBoolean("coupon_used", false) ? "使用済み" : "未使用・月1回";
-        coupon.addView(text(state, 12, prefs.getBoolean("coupon_used", false) ? MUTED : GOLD, true), topMargin(dp(9)));
+        boolean used = prefs.getBoolean("coupon_used", false);
+        coupon.addView(text(used ? "使用済み" : "未使用・月1回", 12, used ? MUTED : GOLD, true), topMargin(dp(9)));
         coupon.setOnClickListener(v -> showCoupon());
         content.addView(coupon, topMargin(dp(9)));
 
@@ -167,7 +160,7 @@ public class MainActivity extends Activity {
         content.addView(tileRow("季節のおすすめ", "旬の食材・限定料理", "宴会・接待", "コース・お席のご案内"), topMargin(dp(9)));
         content.addView(tileRow("日本酒", "季節酒・おすすめ銘柄", "おすすめドリンク", "ビール・焼酎・ハイボール"), topMargin(dp(10)));
 
-        TextView note = text("v0.3 試作版　ポイントとクーポンの操作は端末内に保存されます", 11, MUTED, false);
+        TextView note = text("v0.4 試作版　店側操作はiPad専用画面へ分離", 11, MUTED, false);
         note.setGravity(Gravity.CENTER);
         content.addView(note, topMargin(dp(20)));
     }
@@ -202,11 +195,10 @@ public class MainActivity extends Activity {
         ImageView qr = new ImageView(this);
         Bitmap bitmap = makeQr("HAMASHO_MEMBER:" + MEMBER_ID, 760);
         if (bitmap != null) qr.setImageBitmap(bitmap);
-        LinearLayout.LayoutParams qrLp = new LinearLayout.LayoutParams(dp(230), dp(230));
-        qrCard.addView(qr, qrLp);
-        TextView qrLabel = text("会計時にこのQRをスタッフへご提示ください", 13, Color.rgb(45, 40, 34), true);
-        qrLabel.setGravity(Gravity.CENTER);
-        qrCard.addView(qrLabel, topMargin(dp(10)));
+        qrCard.addView(qr, new LinearLayout.LayoutParams(dp(230), dp(230)));
+        TextView label = text("会計時にこのQRをスタッフへご提示ください", 13, Color.rgb(45, 40, 34), true);
+        label.setGravity(Gravity.CENTER);
+        qrCard.addView(label, topMargin(dp(10)));
         content.addView(qrCard, topMargin(dp(14)));
 
         LinearLayout progressCard = card(CARD, 16);
@@ -221,8 +213,7 @@ public class MainActivity extends Activity {
         content.removeAllViews();
         selectNav(couponNav);
 
-        int cumulative = prefs.getInt("cumulative", 0);
-        RankInfo rank = rankInfo(cumulative);
+        RankInfo rank = rankInfo(prefs.getInt("cumulative", 0));
         boolean used = prefs.getBoolean("coupon_used", false);
 
         content.addView(sectionTitle("月1回 会員クーポン"), matchWrap());
@@ -233,7 +224,7 @@ public class MainActivity extends Activity {
         coupon.addView(text(couponText(rank.name), 21, used ? MUTED : GOLD, true), topMargin(dp(10)));
         addDivider(coupon, dp(16));
         coupon.addView(text(used ? "使用済み" : "未使用", 19, used ? MUTED : GOLD, true), topMargin(dp(13)));
-        coupon.addView(text("有効期限：" + currentMonth() + "月末まで\n利用回数：月1回\n※使用処理はスタッフ画面から行います", 14, TEXT, false), topMargin(dp(10)));
+        coupon.addView(text("有効期限：" + currentMonth() + "月末まで\n利用回数：月1回\n※使用確定は店舗スタッフが行います", 14, TEXT, false), topMargin(dp(10)));
         content.addView(coupon, topMargin(dp(12)));
 
         LinearLayout ranks = card(CARD, 16);
@@ -243,124 +234,22 @@ public class MainActivity extends Activity {
         content.addView(ranks, topMargin(dp(14)));
     }
 
-    private void showStaff() {
+    private void showStore() {
         content.removeAllViews();
-        selectNav(staffNav);
-        content.addView(sectionTitle("スタッフ管理"), matchWrap());
+        selectNav(storeNav);
+        content.addView(sectionTitle("店舗・予約"), matchWrap());
 
-        if (!staffUnlocked) {
-            LinearLayout login = card(CARD, 18);
-            login.setPadding(dp(18), dp(18), dp(18), dp(18));
-            login.addView(text("スタッフPIN", 16, GOLD, true), matchWrap());
-            login.addView(text("試作PIN：1188", 12, MUTED, false), topMargin(dp(5)));
-            EditText pin = input("PINを入力", true);
-            login.addView(pin, topMargin(dp(12)));
-            Button open = actionButton("管理画面を開く");
-            open.setOnClickListener(v -> {
-                if (STAFF_PIN.equals(pin.getText().toString().trim())) {
-                    staffUnlocked = true;
-                    showStaff();
-                } else {
-                    Toast.makeText(this, "PINが違います", Toast.LENGTH_SHORT).show();
-                }
-            });
-            login.addView(open, topMargin(dp(12)));
-            content.addView(login, topMargin(dp(12)));
-            return;
-        }
+        LinearLayout store = card(CARD_ALT, 18);
+        store.setPadding(dp(18), dp(18), dp(18), dp(18));
+        store.addView(text("濱匠別邸", 26, GOLD, true), matchWrap());
+        store.addView(text("店舗情報・電話・ネット予約は、実際の情報を確認してから設定します。", 14, TEXT, false), topMargin(dp(10)));
+        content.addView(store, topMargin(dp(12)));
 
-        int available = prefs.getInt("available", 0);
-        int cumulative = prefs.getInt("cumulative", 0);
-        RankInfo rank = rankInfo(cumulative);
-
-        LinearLayout member = card(CARD_ALT, 18);
-        member.setPadding(dp(18), dp(16), dp(18), dp(16));
-        member.addView(text("会員ID  " + MEMBER_ID, 13, MUTED, false), matchWrap());
-        member.addView(text(rank.name + " 会員", 24, GOLD, true), topMargin(dp(5)));
-        member.addView(text("利用可能 " + available + " pt　／　累計 " + cumulative + " pt", 14, TEXT, false), topMargin(dp(8)));
-        member.addView(text("最終操作：" + prefs.getString("last_action", "なし"), 12, MUTED, false), topMargin(dp(8)));
-        content.addView(member, topMargin(dp(12)));
-
-        LinearLayout addCard = card(CARD, 16);
-        addCard.setPadding(dp(18), dp(16), dp(18), dp(16));
-        addCard.addView(text("ポイント付与", 16, GOLD, true), matchWrap());
-        addCard.addView(text("会計金額を入力すると、100円＝1ptで付与します", 12, MUTED, false), topMargin(dp(5)));
-        EditText amount = input("例：12800", false);
-        addCard.addView(amount, topMargin(dp(10)));
-        Button add = actionButton("会計金額からポイント付与");
-        add.setOnClickListener(v -> {
-            int yen = parseInt(amount.getText().toString());
-            if (yen < 100) {
-                toast("100円以上を入力してください");
-                return;
-            }
-            int pts = yen / 100;
-            prefs.edit()
-                    .putInt("available", prefs.getInt("available", 0) + pts)
-                    .putInt("cumulative", prefs.getInt("cumulative", 0) + pts)
-                    .putString("last_action", yen + "円会計 → " + pts + "pt付与")
-                    .apply();
-            toast(pts + "pt付与しました");
-            showStaff();
-        });
-        addCard.addView(add, topMargin(dp(10)));
-        content.addView(addCard, topMargin(dp(14)));
-
-        LinearLayout useCard = card(CARD, 16);
-        useCard.setPadding(dp(18), dp(16), dp(18), dp(16));
-        useCard.addView(text("ポイント使用", 16, GOLD, true), matchWrap());
-        EditText usePts = input("使用ポイント数", false);
-        useCard.addView(usePts, topMargin(dp(10)));
-        Button use = actionButton("ポイントを使用");
-        use.setOnClickListener(v -> {
-            int pts = parseInt(usePts.getText().toString());
-            int now = prefs.getInt("available", 0);
-            if (pts <= 0 || pts > now) {
-                toast("利用可能ポイント以内で入力してください");
-                return;
-            }
-            prefs.edit()
-                    .putInt("available", now - pts)
-                    .putString("last_action", pts + "pt使用")
-                    .apply();
-            toast(pts + "pt使用しました");
-            showStaff();
-        });
-        useCard.addView(use, topMargin(dp(10)));
-        content.addView(useCard, topMargin(dp(14)));
-
-        LinearLayout cpCard = card(CARD, 16);
-        cpCard.setPadding(dp(18), dp(16), dp(18), dp(16));
-        cpCard.addView(text("今月のクーポン", 16, GOLD, true), matchWrap());
-        boolean used = prefs.getBoolean("coupon_used", false);
-        cpCard.addView(text(used ? "現在：使用済み" : "現在：未使用", 14, used ? MUTED : TEXT, true), topMargin(dp(7)));
-        Button useCoupon = actionButton(used ? "クーポンは使用済みです" : "クーポンを使用済みにする");
-        useCoupon.setEnabled(!used);
-        useCoupon.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("クーポン使用確認")
-                .setMessage("この会員の今月クーポンを使用済みにしますか？")
-                .setNegativeButton("戻る", null)
-                .setPositiveButton("使用する", (d, w) -> {
-                    prefs.edit().putBoolean("coupon_used", true).putString("last_action", currentMonth() + "月クーポン使用").apply();
-                    toast("クーポンを使用済みにしました");
-                    showStaff();
-                }).show());
-        cpCard.addView(useCoupon, topMargin(dp(10)));
-        content.addView(cpCard, topMargin(dp(14)));
-
-        Button reset = actionButton("試作データを初期状態へ戻す");
-        reset.setBackground(roundRect(DANGER, 12));
-        reset.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("試作データをリセット")
-                .setMessage("ポイントとクーポン状態を初期値へ戻します。")
-                .setNegativeButton("やめる", null)
-                .setPositiveButton("リセット", (d, w) -> {
-                    prefs.edit().clear().apply();
-                    ensureDefaults();
-                    toast("初期状態へ戻しました");
-                    showStaff();
-                }).show());
-        content.addView(reset, topMargin(dp(16)));
+        LinearLayout guide = card(CARD, 16);
+        guide.setPadding(dp(18), dp(16), dp(18), dp(16));
+        guide.addView(text("ポイントご利用について", 16, GOLD, true), matchWrap());
+        guide.addView(text("100円（税込）＝1ポイント\n1ポイント＝1円\n300ポイントからご利用いただけます。", 14, TEXT, false), topMargin(dp(10)));
+        content.addView(guide, topMargin(dp(14)));
     }
 
     private RankInfo rankInfo(int cumulative) {
@@ -427,31 +316,6 @@ public class MainActivity extends Activity {
         return box;
     }
 
-    private EditText input(String hint, boolean password) {
-        EditText e = new EditText(this);
-        e.setHint(hint);
-        e.setHintTextColor(Color.rgb(135, 125, 112));
-        e.setTextColor(TEXT);
-        e.setTextSize(17);
-        e.setSingleLine(true);
-        e.setPadding(dp(14), dp(11), dp(14), dp(11));
-        e.setBackground(roundRect(Color.rgb(29, 25, 21), 12));
-        e.setInputType(password ? InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD : InputType.TYPE_CLASS_NUMBER);
-        return e;
-    }
-
-    private Button actionButton(String label) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setTextColor(Color.rgb(29, 24, 18));
-        b.setTextSize(15);
-        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setAllCaps(false);
-        b.setPadding(dp(14), dp(10), dp(14), dp(10));
-        b.setBackground(roundRect(GOLD, 12));
-        return b;
-    }
-
     private Button navButton(String label) {
         Button b = new Button(this);
         b.setText(label);
@@ -464,7 +328,7 @@ public class MainActivity extends Activity {
     }
 
     private void selectNav(Button selected) {
-        Button[] all = {homeNav, memberNav, couponNav, staffNav};
+        Button[] all = {homeNav, memberNav, couponNav, storeNav};
         for (Button b : all) {
             b.setTextColor(b == selected ? GOLD : MUTED);
             b.setTypeface(Typeface.DEFAULT, b == selected ? Typeface.BOLD : Typeface.NORMAL);
@@ -531,16 +395,8 @@ public class MainActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private int parseInt(String value) {
-        try { return Integer.parseInt(value.trim()); } catch (Exception e) { return 0; }
-    }
-
     private int currentMonth() {
         return Calendar.getInstance().get(Calendar.MONTH) + 1;
-    }
-
-    private void toast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     private static class RankInfo {
