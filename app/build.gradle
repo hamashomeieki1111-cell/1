@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 5
-        versionName '0.3.2-navfix-signfix'
+        versionCode 6
+        versionName '0.4-customer-staff-split'
     }
 
     signingConfigs {
