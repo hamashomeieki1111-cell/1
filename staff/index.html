@@ -6,13 +6,14 @@
 <title>濱匠別邸 会員管理</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
-:root{--bg:#17130f;--panel:#28221c;--panel2:#30281f;--gold:#d6b060;--text:#f6f1e7;--muted:#bcaf9a;--danger:#873730}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif}.wrap{max-width:860px;margin:auto;padding:24px 18px 40px}.brand{text-align:center;color:var(--gold);font-size:30px;font-weight:700}.sub{text-align:center;color:var(--muted);font-size:13px;margin-top:4px}.card{background:var(--panel);border-radius:18px;padding:18px;margin-top:16px}.gold{color:var(--gold)}h2{font-size:20px;margin:0 0 12px}input{width:100%;font-size:22px;padding:14px;border-radius:12px;border:1px solid #5b4c3c;background:#1e1a16;color:var(--text)}button{width:100%;font-size:18px;font-weight:700;padding:14px;border:0;border-radius:12px;margin-top:10px;background:var(--gold);color:#211a12}button.secondary{background:#4c4034;color:var(--text)}button.danger{background:var(--danger);color:#fff}.hidden{display:none}.camera{width:100%;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;position:relative}video,canvas{width:100%;height:100%;object-fit:cover}.scanline{position:absolute;left:12%;right:12%;top:50%;border-top:2px solid var(--gold)}.member{font-size:26px;font-weight:700;color:var(--gold)}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.stat{background:var(--panel2);border-radius:12px;padding:14px;text-align:center}.stat b{display:block;color:var(--gold);font-size:24px}.small{font-size:13px;color:var(--muted);line-height:1.6}.ok{padding:12px;border-radius:12px;background:#263629;color:#dff3df;margin-top:12px}.warn{padding:12px;border-radius:12px;background:#493525;color:#ffe3bd;margin-top:12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:600px){.row{grid-template-columns:1fr}.wrap{padding-left:12px;padding-right:12px}}
+:root{--bg:#17130f;--panel:#28221c;--panel2:#30281f;--gold:#d6b060;--text:#f6f1e7;--muted:#bcaf9a;--danger:#873730}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif}.wrap{max-width:860px;margin:auto;padding:24px 18px 40px}.brand{text-align:center;color:var(--gold);font-size:30px;font-weight:700}.sub{text-align:center;color:var(--muted);font-size:13px;margin-top:4px}.sync{text-align:center;font-size:12px;color:var(--gold);margin-top:7px}.card{background:var(--panel);border-radius:18px;padding:18px;margin-top:16px}.gold{color:var(--gold)}h2{font-size:20px;margin:0 0 12px}input{width:100%;font-size:22px;padding:14px;border-radius:12px;border:1px solid #5b4c3c;background:#1e1a16;color:var(--text)}button{width:100%;font-size:18px;font-weight:700;padding:14px;border:0;border-radius:12px;margin-top:10px;background:var(--gold);color:#211a12}button.secondary{background:#4c4034;color:var(--text)}button.danger{background:var(--danger);color:#fff}button:disabled{opacity:.45}.hidden{display:none}.camera{width:100%;aspect-ratio:4/3;background:#000;border-radius:14px;overflow:hidden;position:relative}video,canvas{width:100%;height:100%;object-fit:cover}.scanline{position:absolute;left:12%;right:12%;top:50%;border-top:2px solid var(--gold)}.member{font-size:26px;font-weight:700;color:var(--gold)}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.stat{background:var(--panel2);border-radius:12px;padding:14px;text-align:center}.stat b{display:block;color:var(--gold);font-size:24px}.small{font-size:13px;color:var(--muted);line-height:1.6}.ok{padding:12px;border-radius:12px;background:#263629;color:#dff3df;margin-top:12px}.warn{padding:12px;border-radius:12px;background:#493525;color:#ffe3bd;margin-top:12px}@media(max-width:600px){.wrap{padding-left:12px;padding-right:12px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="brand">濱匠別邸</div>
-  <div class="sub">店舗スタッフ 会員管理・iPad試作版</div>
+  <div class="sub">店舗スタッフ 会員管理・同期デモ</div>
+  <div class="sync">Supabase 接続版 v0.6</div>
 
   <section id="login" class="card">
     <h2 class="gold">スタッフ認証</h2>
@@ -39,6 +40,7 @@
         <div class="stat"><b id="cumulative">0 pt</b><span class="small">累計</span></div>
       </div>
       <div id="couponState" class="small" style="margin-top:10px"></div>
+      <button class="secondary" onclick="reloadCurrent()">Supabaseから再読込</button>
     </section>
 
     <section id="ops" class="hidden">
@@ -64,33 +66,64 @@
 
       <div id="result"></div>
       <div class="card">
-        <div class="small">※このv0.4は「iPadでQRを読めるか」の試験版です。ここで変更したポイントはまだAndroidアプリへ自動同期しません。次段階で共有データベースに接続します。</div>
-        <button class="danger" onclick="resetDemo()">iPad側の試作データをリセット</button>
+        <div class="small">※この画面で変更したポイント・クーポンはSupabaseへ保存され、Android同期版から同じデータを読み取ります。現在は社長確認用デモ会員 HMB-000001 のみです。</div>
+        <button class="danger" onclick="resetDemo()">デモデータを428pt / 8750ptへ戻す</button>
       </div>
     </section>
   </main>
 </div>
 <script>
 const PIN='1188';
-let currentId=null, stream=null, scanning=false;
+const SUPABASE_URL='https://sedprfuiymcgbhatofwb.supabase.co';
+const SUPABASE_KEY='sb_publishable_BIJQSq4IQRxgwwqWd3YmTQ_etujBnSj';
+let currentId=null,currentData=null,stream=null,scanning=false;
 const defaults={available:428,cumulative:8750,couponUsed:false};
-function login(){if(document.getElementById('pin').value===PIN){loginEl().classList.add('hidden');document.getElementById('app').classList.remove('hidden')}else alert('PINが違います')}
-function loginEl(){return document.getElementById('login')}
-function key(id){return 'hamasho_member_'+id}
-function loadMember(id){currentId=id;let d;try{d=JSON.parse(localStorage.getItem(key(id)))||{...defaults}}catch(e){d={...defaults}};render(id,d)}
-function save(d){localStorage.setItem(key(currentId),JSON.stringify(d));render(currentId,d)}
-function getData(){try{return JSON.parse(localStorage.getItem(key(currentId)))||{...defaults}}catch(e){return {...defaults}}}
+
+function login(){if(document.getElementById('pin').value===PIN){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden')}else alert('PINが違います')}
 function rank(c){if(c>=30000)return '別邸';if(c>=10000)return '匠';if(c>=3000)return '雅';return '粋'}
-function render(id,d){document.getElementById('memberCard').classList.remove('hidden');document.getElementById('ops').classList.remove('hidden');document.getElementById('memberId').textContent=id;document.getElementById('rank').textContent=rank(d.cumulative)+' 会員';document.getElementById('available').textContent=d.available+' pt';document.getElementById('cumulative').textContent=d.cumulative+' pt';document.getElementById('couponState').textContent='今月クーポン：'+(d.couponUsed?'使用済み':'未使用');document.getElementById('couponText').textContent=couponText(rank(d.cumulative));let b=document.getElementById('couponBtn');b.disabled=d.couponUsed;b.textContent=d.couponUsed?'使用済みです':'クーポンを使用済みにする'}
 function couponText(r){if(r==='雅')return 'ビール・焼酎・ハイボールから1杯';if(r==='匠')return '日本酒を含む対象ドリンク1杯';if(r==='別邸')return '対象ドリンク1杯＋季節の一品';return '通常会員クーポン'}
+function normalize(row){return {available:Number(row.available_points||0),cumulative:Number(row.cumulative_points||0),couponUsed:Boolean(row.coupon_used)}}
+
+async function api(path,options={}){
+  const headers=Object.assign({'apikey':SUPABASE_KEY,'Content-Type':'application/json'},options.headers||{});
+  const res=await fetch(SUPABASE_URL+path,Object.assign({},options,{headers}));
+  const text=await res.text();
+  if(!res.ok)throw new Error('HTTP '+res.status+' '+text);
+  return text?JSON.parse(text):null;
+}
+
+async function loadMember(id){
+  currentId=id;show('Supabaseから会員情報を読み込み中…',true);
+  try{
+    const rows=await api('/rest/v1/demo_members?member_id=eq.'+encodeURIComponent(id)+'&select=member_id,available_points,cumulative_points,coupon_used,updated_at');
+    if(!rows||!rows.length){currentData=null;document.getElementById('memberCard').classList.add('hidden');document.getElementById('ops').classList.add('hidden');return show('この試作ではデモ会員 HMB-000001 のみ利用できます',false)}
+    currentData=normalize(rows[0]);render(id,currentData);show('Supabaseと同期しました',true);
+  }catch(e){show('同期できませんでした：'+e.message,false)}
+}
+async function reloadCurrent(){if(currentId)await loadMember(currentId)}
+async function saveData(d){
+  if(!currentId)return;
+  const body={available_points:d.available,cumulative_points:d.cumulative,coupon_used:d.couponUsed,updated_at:new Date().toISOString()};
+  const rows=await api('/rest/v1/demo_members?member_id=eq.'+encodeURIComponent(currentId),{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify(body)});
+  currentData=rows&&rows.length?normalize(rows[0]):d;render(currentId,currentData);
+}
+function render(id,d){
+  document.getElementById('memberCard').classList.remove('hidden');document.getElementById('ops').classList.remove('hidden');
+  document.getElementById('memberId').textContent=id;document.getElementById('rank').textContent=rank(d.cumulative)+' 会員';
+  document.getElementById('available').textContent=d.available+' pt';document.getElementById('cumulative').textContent=d.cumulative+' pt';
+  document.getElementById('couponState').textContent='今月クーポン：'+(d.couponUsed?'使用済み':'未使用');document.getElementById('couponText').textContent=couponText(rank(d.cumulative));
+  const b=document.getElementById('couponBtn');b.disabled=d.couponUsed;b.textContent=d.couponUsed?'使用済みです':'クーポンを使用済みにする';
+}
 function loadDemo(){loadMember('HMB-000001')}
-async function startCamera(){if(scanning)return;try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});let v=document.getElementById('video');v.srcObject=stream;await v.play();scanning=true;document.getElementById('cameraBtn').textContent='読み取り中…';requestAnimationFrame(tick)}catch(e){document.getElementById('scanMsg').textContent='カメラを起動できません。Safariのカメラ許可を確認してください。'}}
+
+async function startCamera(){if(scanning)return;try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});const v=document.getElementById('video');v.srcObject=stream;await v.play();scanning=true;document.getElementById('cameraBtn').textContent='読み取り中…';requestAnimationFrame(tick)}catch(e){document.getElementById('scanMsg').textContent='カメラを起動できません。Safariのカメラ許可を確認してください。'}}
 function stopCamera(){scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}document.getElementById('cameraBtn').textContent='カメラを起動'}
-function tick(){if(!scanning)return;let v=document.getElementById('video');if(v.readyState===v.HAVE_ENOUGH_DATA){let c=document.getElementById('canvas'),ctx=c.getContext('2d');c.width=v.videoWidth;c.height=v.videoHeight;ctx.drawImage(v,0,0,c.width,c.height);let img=ctx.getImageData(0,0,c.width,c.height);let code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});if(code){let raw=code.data||'';if(raw.startsWith('HAMASHO_MEMBER:')){let id=raw.split(':')[1];stopCamera();document.getElementById('scanMsg').textContent='読み取り成功：'+id;loadMember(id);return}}}requestAnimationFrame(tick)}
-function addPoints(){if(!currentId)return;let yen=parseInt(document.getElementById('amount').value||'0',10);if(yen<100)return show('100円以上を入力してください',false);let pts=Math.floor(yen/100),d=getData();d.available+=pts;d.cumulative+=pts;save(d);show(yen+'円 → '+pts+'pt付与しました',true);document.getElementById('amount').value=''}
-function usePoints(){if(!currentId)return;let pts=parseInt(document.getElementById('usePts').value||'0',10),d=getData();if(pts<300)return show('ポイント使用は300ptからです',false);if(pts>d.available)return show('利用可能ポイントを超えています',false);d.available-=pts;save(d);show(pts+'pt使用しました',true);document.getElementById('usePts').value=''}
-function useCoupon(){let d=getData();if(d.couponUsed)return;if(confirm('今月のクーポンを使用済みにしますか？')){d.couponUsed=true;save(d);show('クーポンを使用済みにしました',true)}}
-function resetDemo(){if(currentId&&confirm('iPad側の試作データを初期状態へ戻しますか？')){localStorage.removeItem(key(currentId));loadMember(currentId);show('初期状態へ戻しました',true)}}
+function tick(){if(!scanning)return;const v=document.getElementById('video');if(v.readyState===v.HAVE_ENOUGH_DATA){const c=document.getElementById('canvas'),ctx=c.getContext('2d');c.width=v.videoWidth;c.height=v.videoHeight;ctx.drawImage(v,0,0,c.width,c.height);const img=ctx.getImageData(0,0,c.width,c.height);const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});if(code){const raw=code.data||'';if(raw.startsWith('HAMASHO_MEMBER:')){const id=raw.substring('HAMASHO_MEMBER:'.length);stopCamera();document.getElementById('scanMsg').textContent='読み取り成功：'+id;loadMember(id);return}}}requestAnimationFrame(tick)}
+
+async function addPoints(){if(!currentData)return;const yen=parseInt(document.getElementById('amount').value||'0',10);if(yen<100)return show('100円以上を入力してください',false);const pts=Math.floor(yen/100),d={...currentData};d.available+=pts;d.cumulative+=pts;try{await saveData(d);show(yen+'円 → '+pts+'pt付与し、Supabaseへ保存しました',true);document.getElementById('amount').value=''}catch(e){show('保存できませんでした：'+e.message,false)}}
+async function usePoints(){if(!currentData)return;const pts=parseInt(document.getElementById('usePts').value||'0',10),d={...currentData};if(pts<300)return show('ポイント使用は300ptからです',false);if(pts>d.available)return show('利用可能ポイントを超えています',false);d.available-=pts;try{await saveData(d);show(pts+'pt使用し、Supabaseへ保存しました',true);document.getElementById('usePts').value=''}catch(e){show('保存できませんでした：'+e.message,false)}}
+async function useCoupon(){if(!currentData||currentData.couponUsed)return;if(confirm('今月のクーポンを使用済みにしますか？')){const d={...currentData,couponUsed:true};try{await saveData(d);show('クーポンを使用済みにし、Supabaseへ保存しました',true)}catch(e){show('保存できませんでした：'+e.message,false)}}}
+async function resetDemo(){if(!confirm('デモ会員を初期状態へ戻しますか？'))return;try{await saveData({...defaults});show('デモデータを初期状態へ戻しました',true)}catch(e){show('リセットできませんでした：'+e.message,false)}}
 function show(msg,ok){document.getElementById('result').innerHTML='<div class="'+(ok?'ok':'warn')+'">'+msg+'</div>'}
 </script>
 </body>
