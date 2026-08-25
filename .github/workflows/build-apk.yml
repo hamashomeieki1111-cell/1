@@ -30,8 +30,17 @@ jobs:
 
       - name: Restore official Hamasho logo
         run: |
-          base64 -d ci/hamasho_logo_gold.b64 > app/src/main/assets/hamasho_logo_gold.png
-          test "$(od -An -tx1 -N8 app/src/main/assets/hamasho_logo_gold.png | tr -d ' \n')" = "89504e470d0a1a0a"
+          base64 -d ci/hamasho_logo_gold.b64 > app/src/main/assets/hamasho_logo_gold.jpg
+          test "$(od -An -tx1 -N2 app/src/main/assets/hamasho_logo_gold.jpg | tr -d ' \n')" = "ffd8"
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from PIL import Image
+          p='app/src/main/assets/hamasho_logo_gold.jpg'
+          with Image.open(p) as im:
+              assert im.width >= 200 and im.height >= 150
+              im.verify()
+          print('Official Hamasho JPEG logo restored and verified')
+          PY
 
       - name: Restore Hamasho photo sprite
         run: |
@@ -43,7 +52,6 @@ jobs:
               ci/sprite_v091_part6.txt \
             | base64 -d > /tmp/home_sprite_v09_small.jpg
           test "$(od -An -tx1 -N2 /tmp/home_sprite_v09_small.jpg | tr -d ' \n')" = "ffd8"
-          python3 -m pip install --quiet pillow
           python3 - <<'PY'
           from PIL import Image
           from pathlib import Path
@@ -70,10 +78,10 @@ jobs:
       - name: Verify original-design assets inside APK
         run: |
           unzip -p app/build/outputs/apk/debug/app-debug.apk assets/home_sprite_v09.jpg > /tmp/apk_home_sprite.jpg
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/hamasho_logo_gold.png > /tmp/apk_logo.png
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/hamasho_logo_gold.jpg > /tmp/apk_logo.jpg
           unzip -p app/build/outputs/apk/debug/app-debug.apk assets/index.html > /tmp/apk_index.html
           test "$(od -An -tx1 -N2 /tmp/apk_home_sprite.jpg | tr -d ' \n')" = "ffd8"
-          test "$(od -An -tx1 -N8 /tmp/apk_logo.png | tr -d ' \n')" = "89504e470d0a1a0a"
+          test "$(od -An -tx1 -N2 /tmp/apk_logo.jpg | tr -d ' \n')" = "ffd8"
           test -s /tmp/apk_index.html
           grep -q "季節のおすすめ" /tmp/apk_index.html
           grep -q "濱匠" /tmp/apk_index.html
@@ -82,11 +90,10 @@ jobs:
           with Image.open('/tmp/apk_home_sprite.jpg') as im:
               assert im.size == (800, 940)
               im.verify()
-          with Image.open('/tmp/apk_logo.png') as im:
-              assert im.width > 200
-              assert im.height > 100
+          with Image.open('/tmp/apk_logo.jpg') as im:
+              assert im.width >= 200 and im.height >= 150
               im.verify()
-          print('APK original-design HTML, photos and official logo verified')
+          print('APK original-design HTML, photos and official JPEG logo verified')
           PY
 
       - name: Upload APK
