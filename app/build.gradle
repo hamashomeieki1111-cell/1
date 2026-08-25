@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 18
-        versionName '1.0.3-logo-layout-fix'
+        versionCode 19
+        versionName '1.0.4-official-svg-logo'
     }
 
     buildTypes {
