@@ -21,7 +21,19 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.common.BitMatrix;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
 
@@ -34,10 +46,21 @@ public class MainActivity extends Activity {
     private static final int DIVIDER = Color.rgb(79, 67, 53);
 
     private static final String MEMBER_ID = "HMB-000001";
+    private static final String SUPABASE_URL = "https://sedprfuiymcgbhatofwb.supabase.co";
+    private static final String SUPABASE_KEY = "sb_publishable_BIJQSq4IQRxgwwqWd3YmTQ_etujBnSj";
+
+    private static final int PAGE_HOME = 0;
+    private static final int PAGE_MEMBER = 1;
+    private static final int PAGE_COUPON = 2;
+    private static final int PAGE_STORE = 3;
 
     private LinearLayout content;
     private Button homeNav, memberNav, couponNav, storeNav;
     private SharedPreferences prefs;
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private int currentPage = PAGE_HOME;
+    private boolean syncing = false;
+    private String syncText = "Supabase接続待ち";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +71,18 @@ public class MainActivity extends Activity {
         ensureDefaults();
         buildShell();
         showHome();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        syncFromSupabase();
+    }
+
+    @Override
+    protected void onDestroy() {
+        io.shutdownNow();
+        super.onDestroy();
     }
 
     private void ensureDefaults() {
@@ -64,6 +99,7 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
+        root.setFitsSystemWindows(true);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
@@ -78,7 +114,7 @@ public class MainActivity extends Activity {
         tagline.setGravity(Gravity.CENTER);
         header.addView(tagline, topMargin(dp(3)));
 
-        TextView demo = text("社長確認用・DEMO", 10, Color.rgb(34, 28, 21), true);
+        TextView demo = text("社長確認用・同期DEMO", 10, Color.rgb(34, 28, 21), true);
         demo.setGravity(Gravity.CENTER);
         demo.setPadding(dp(10), dp(4), dp(10), dp(4));
         demo.setBackground(roundRect(GOLD, 20));
@@ -86,7 +122,6 @@ public class MainActivity extends Activity {
         demoLp.gravity = Gravity.CENTER_HORIZONTAL;
         demoLp.topMargin = dp(7);
         header.addView(demo, demoLp);
-
         root.addView(header, matchWrap());
 
         ScrollView scroll = new ScrollView(this);
@@ -102,12 +137,12 @@ public class MainActivity extends Activity {
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setPadding(dp(6), dp(7), dp(6), dp(8));
         nav.setBackgroundColor(Color.rgb(18, 15, 12));
+        nav.setFitsSystemWindows(true);
 
         homeNav = navButton("ホーム");
         memberNav = navButton("会員証");
         couponNav = navButton("クーポン");
         storeNav = navButton("店舗");
-
         nav.addView(homeNav, weighted());
         nav.addView(memberNav, weighted());
         nav.addView(couponNav, weighted());
@@ -123,8 +158,10 @@ public class MainActivity extends Activity {
     }
 
     private void showHome() {
+        currentPage = PAGE_HOME;
         content.removeAllViews();
         selectNav(homeNav);
+        addSyncCard();
 
         int available = prefs.getInt("available", 0);
         int cumulative = prefs.getInt("cumulative", 0);
@@ -132,14 +169,12 @@ public class MainActivity extends Activity {
 
         LinearLayout memberCard = card(CARD_ALT, 18);
         memberCard.setPadding(dp(18), dp(16), dp(18), dp(16));
-
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(text("HAMASHO MEMBER", 13, MUTED, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         top.addView(badge(rank.name));
         memberCard.addView(top, matchWrap());
-
         memberCard.addView(text(available + " pt", 32, GOLD, true), topMargin(dp(10)));
         memberCard.addView(text("利用可能ポイント", 12, MUTED, false), matchWrap());
         memberCard.addView(text("累計 " + cumulative + " pt", 14, TEXT, false), topMargin(dp(12)));
@@ -154,7 +189,7 @@ public class MainActivity extends Activity {
         p.topMargin = dp(9);
         memberCard.addView(progress, p);
         memberCard.setOnClickListener(v -> showMember());
-        content.addView(memberCard, matchWrap());
+        content.addView(memberCard, topMargin(dp(12)));
 
         content.addView(sectionTitle("今月の会員特典"), topMargin(dp(22)));
         LinearLayout coupon = card(Color.rgb(59, 42, 28), 16);
@@ -170,29 +205,26 @@ public class MainActivity extends Activity {
         content.addView(tileRow("季節のおすすめ", "旬の食材・限定料理", "宴会・接待", "コース・お席のご案内"), topMargin(dp(9)));
         content.addView(tileRow("日本酒", "季節酒・おすすめ銘柄", "おすすめドリンク", "ビール・焼酎・ハイボール"), topMargin(dp(10)));
 
-        content.addView(sectionTitle("導入イメージ"), topMargin(dp(22)));
         LinearLayout flow = card(CARD, 16);
         flow.setPadding(dp(18), dp(16), dp(18), dp(16));
-        flow.addView(text("① お客様が会員QRを提示", 15, TEXT, true), matchWrap());
-        flow.addView(text("② 店舗iPadでQRを読み取り", 15, TEXT, true), topMargin(dp(9)));
-        flow.addView(text("③ 会計金額からポイントを付与", 15, TEXT, true), topMargin(dp(9)));
-        flow.addView(text("④ 本番導入時はポイント・クーポンを自動同期", 15, GOLD, true), topMargin(dp(9)));
-        content.addView(flow, topMargin(dp(9)));
+        flow.addView(text("同期デモの流れ", 16, GOLD, true), matchWrap());
+        flow.addView(text("① Androidで会員QRを表示\n② iPadでQRを読み取る\n③ iPadでポイント付与\n④ Supabaseへ保存\n⑤ Androidで「最新情報を同期」", 14, TEXT, false), topMargin(dp(9)));
+        content.addView(flow, topMargin(dp(20)));
 
-        TextView note = text("v0.5 社長確認用　※表示中の会員情報・ポイントはデモデータです", 11, MUTED, false);
+        TextView note = text("v0.6 同期デモ　※会員情報はデモデータです", 11, MUTED, false);
         note.setGravity(Gravity.CENTER);
-        content.addView(note, topMargin(dp(20)));
+        content.addView(note, topMargin(dp(18)));
     }
 
     private void showMember() {
+        currentPage = PAGE_MEMBER;
         content.removeAllViews();
         selectNav(memberNav);
+        content.addView(sectionTitle("会員証・ポイント"), matchWrap());
 
         int available = prefs.getInt("available", 0);
         int cumulative = prefs.getInt("cumulative", 0);
         RankInfo rank = rankInfo(cumulative);
-
-        content.addView(sectionTitle("会員証・ポイント"), matchWrap());
 
         LinearLayout memberCard = card(CARD_ALT, 20);
         memberCard.setPadding(dp(20), dp(20), dp(20), dp(20));
@@ -200,7 +232,6 @@ public class MainActivity extends Activity {
         memberCard.addView(text(rank.name + " 会員", 30, GOLD, true), topMargin(dp(8)));
         memberCard.addView(text("会員ID  " + MEMBER_ID, 13, MUTED, false), topMargin(dp(7)));
         addDivider(memberCard, dp(15));
-
         LinearLayout stats = new LinearLayout(this);
         stats.setOrientation(LinearLayout.HORIZONTAL);
         stats.addView(stat(available + " pt", "利用可能"), weighted());
@@ -220,26 +251,24 @@ public class MainActivity extends Activity {
         qrCard.addView(label, topMargin(dp(10)));
         content.addView(qrCard, topMargin(dp(14)));
 
+        addSyncButton();
+
         LinearLayout progressCard = card(CARD, 16);
         progressCard.setPadding(dp(18), dp(16), dp(18), dp(16));
         progressCard.addView(text("ランクアップ", 15, GOLD, true), matchWrap());
         progressCard.addView(text(rank.nextText, 21, TEXT, true), topMargin(dp(7)));
         progressCard.addView(text("粋 0　雅 3,000　匠 10,000　別邸 30,000", 12, MUTED, false), topMargin(dp(10)));
         content.addView(progressCard, topMargin(dp(14)));
-
-        TextView demo = text("※社長確認用のデモ会員です", 11, MUTED, false);
-        demo.setGravity(Gravity.CENTER);
-        content.addView(demo, topMargin(dp(16)));
     }
 
     private void showCoupon() {
+        currentPage = PAGE_COUPON;
         content.removeAllViews();
         selectNav(couponNav);
+        content.addView(sectionTitle("月1回 会員クーポン"), matchWrap());
 
         RankInfo rank = rankInfo(prefs.getInt("cumulative", 0));
         boolean used = prefs.getBoolean("coupon_used", false);
-
-        content.addView(sectionTitle("月1回 会員クーポン"), matchWrap());
         LinearLayout coupon = card(used ? Color.rgb(42, 39, 35) : Color.rgb(61, 43, 28), 20);
         coupon.setPadding(dp(20), dp(20), dp(20), dp(20));
         coupon.addView(text(currentMonth() + "月 会員様限定", 14, GOLD, true), matchWrap());
@@ -249,21 +278,17 @@ public class MainActivity extends Activity {
         coupon.addView(text(used ? "使用済み" : "未使用", 19, used ? MUTED : GOLD, true), topMargin(dp(13)));
         coupon.addView(text("有効期限：" + currentMonth() + "月末まで\n利用回数：月1回\n※使用確定は店舗スタッフが行います", 14, TEXT, false), topMargin(dp(10)));
         content.addView(coupon, topMargin(dp(12)));
+        addSyncButton();
 
         LinearLayout ranks = card(CARD, 16);
         ranks.setPadding(dp(18), dp(16), dp(18), dp(16));
         ranks.addView(text("ランク連動", 16, GOLD, true), matchWrap());
         ranks.addView(text("粋　　通常会員クーポン\n雅　　ビール・焼酎・ハイボールから1杯\n匠　　日本酒を含む対象ドリンク1杯\n別邸　対象ドリンク＋季節の一品", 14, TEXT, false), topMargin(dp(12)));
         content.addView(ranks, topMargin(dp(14)));
-
-        LinearLayout note = card(CARD_ALT, 16);
-        note.setPadding(dp(18), dp(16), dp(18), dp(16));
-        note.addView(text("本番では店舗側で内容変更可能", 15, GOLD, true), matchWrap());
-        note.addView(text("季節や販促に合わせて、毎月の特典内容を店舗側で変更できる想定です。", 13, TEXT, false), topMargin(dp(7)));
-        content.addView(note, topMargin(dp(14)));
     }
 
     private void showStore() {
+        currentPage = PAGE_STORE;
         content.removeAllViews();
         selectNav(storeNav);
         content.addView(sectionTitle("店舗・予約"), matchWrap());
@@ -280,11 +305,105 @@ public class MainActivity extends Activity {
         guide.addView(text("100円（税込）＝1ポイント\n1ポイント＝1円\n300ポイントからご利用いただけます。", 14, TEXT, false), topMargin(dp(10)));
         content.addView(guide, topMargin(dp(14)));
 
-        LinearLayout approval = card(Color.rgb(59, 42, 28), 16);
-        approval.setPadding(dp(18), dp(16), dp(18), dp(16));
-        approval.addView(text("正式導入で追加するもの", 16, GOLD, true), matchWrap());
-        approval.addView(text("・Androidと店舗iPadのリアルタイム同期\n・スタッフ権限管理\n・ポイント付与／使用／取消の履歴\n・会員ごとの安全なデータ管理\n・バックアップ", 14, TEXT, false), topMargin(dp(10)));
-        content.addView(approval, topMargin(dp(14)));
+        LinearLayout demo = card(Color.rgb(59, 42, 28), 16);
+        demo.setPadding(dp(18), dp(16), dp(18), dp(16));
+        demo.addView(text("現在は社長確認用デモ", 16, GOLD, true), matchWrap());
+        demo.addView(text("Supabaseにはデモ会員 HMB-000001 のみ登録しています。本番前に認証・スタッフ権限・履歴管理を追加します。", 13, TEXT, false), topMargin(dp(8)));
+        content.addView(demo, topMargin(dp(14)));
+    }
+
+    private void addSyncCard() {
+        LinearLayout box = card(Color.rgb(34, 47, 36), 14);
+        box.setPadding(dp(15), dp(12), dp(15), dp(12));
+        box.addView(text(syncing ? "Supabase 同期中…" : syncText, 13, syncing ? GOLD : TEXT, true), matchWrap());
+        Button b = actionButton(syncing ? "同期中…" : "最新情報を同期");
+        b.setEnabled(!syncing);
+        b.setOnClickListener(v -> syncFromSupabase());
+        box.addView(b, topMargin(dp(8)));
+        content.addView(box, matchWrap());
+    }
+
+    private void addSyncButton() {
+        Button b = actionButton(syncing ? "Supabase 同期中…" : "最新情報を同期");
+        b.setEnabled(!syncing);
+        b.setOnClickListener(v -> syncFromSupabase());
+        content.addView(b, topMargin(dp(14)));
+        TextView status = text(syncText, 11, MUTED, false);
+        status.setGravity(Gravity.CENTER);
+        content.addView(status, topMargin(dp(5)));
+    }
+
+    private void syncFromSupabase() {
+        if (syncing) return;
+        syncing = true;
+        renderCurrentPage();
+        io.execute(() -> {
+            try {
+                String id = URLEncoder.encode(MEMBER_ID, StandardCharsets.UTF_8.name());
+                String endpoint = SUPABASE_URL + "/rest/v1/demo_members?member_id=eq." + id
+                        + "&select=available_points,cumulative_points,coupon_used,updated_at";
+                HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("apikey", SUPABASE_KEY);
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+
+                int code = conn.getResponseCode();
+                InputStream input = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+                String body = readAll(input);
+                conn.disconnect();
+                if (code < 200 || code >= 300) throw new Exception("HTTP " + code + " " + body);
+
+                JSONArray rows = new JSONArray(body);
+                if (rows.length() == 0) throw new Exception("デモ会員が見つかりません");
+                JSONObject row = rows.getJSONObject(0);
+                int available = row.getInt("available_points");
+                int cumulative = row.getInt("cumulative_points");
+                boolean couponUsed = row.getBoolean("coupon_used");
+                prefs.edit()
+                        .putInt("available", available)
+                        .putInt("cumulative", cumulative)
+                        .putBoolean("coupon_used", couponUsed)
+                        .apply();
+                runOnUiThread(() -> {
+                    syncing = false;
+                    syncText = "Supabase同期済み  利用可能 " + available + "pt";
+                    renderCurrentPage();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    syncing = false;
+                    syncText = "同期エラー：" + safeError(e.getMessage());
+                    renderCurrentPage();
+                });
+            }
+        });
+    }
+
+    private String readAll(InputStream input) throws Exception {
+        if (input == null) return "";
+        BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+        StringBuilder out = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) out.append(line);
+        reader.close();
+        return out.toString();
+    }
+
+    private String safeError(String value) {
+        if (value == null || value.trim().isEmpty()) return "通信できません";
+        return value.length() > 70 ? value.substring(0, 70) : value;
+    }
+
+    private void renderCurrentPage() {
+        if (content == null) return;
+        switch (currentPage) {
+            case PAGE_MEMBER: showMember(); break;
+            case PAGE_COUPON: showCoupon(); break;
+            case PAGE_STORE: showStore(); break;
+            default: showHome(); break;
+        }
     }
 
     private RankInfo rankInfo(int cumulative) {
@@ -309,9 +428,7 @@ public class MainActivity extends Activity {
             int[] pixels = new int[size * size];
             for (int y = 0; y < size; y++) {
                 int offset = y * size;
-                for (int x = 0; x < size; x++) {
-                    pixels[offset + x] = matrix.get(x, y) ? Color.BLACK : Color.WHITE;
-                }
+                for (int x = 0; x < size; x++) pixels[offset + x] = matrix.get(x, y) ? Color.BLACK : Color.WHITE;
             }
             Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
             bitmap.setPixels(pixels, 0, size, 0, 0, size, size);
@@ -362,6 +479,18 @@ public class MainActivity extends Activity {
         return b;
     }
 
+    private Button actionButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(14);
+        b.setAllCaps(false);
+        b.setTextColor(Color.rgb(34, 28, 21));
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setBackground(roundRect(GOLD, 12));
+        b.setPadding(dp(12), dp(10), dp(12), dp(10));
+        return b;
+    }
+
     private void selectNav(Button selected) {
         Button[] all = {homeNav, memberNav, couponNav, storeNav};
         for (Button b : all) {
@@ -370,9 +499,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private TextView sectionTitle(String value) {
-        return text(value, 19, GOLD, true);
-    }
+    private TextView sectionTitle(String value) { return text(value, 19, GOLD, true); }
 
     private TextView badge(String value) {
         TextView v = text(value, 13, Color.rgb(34, 28, 21), true);
@@ -441,7 +568,6 @@ public class MainActivity extends Activity {
         final String nextText;
         final int progressValue;
         final int progressMax;
-
         RankInfo(String name, String nextText, int progressValue, int progressMax) {
             this.name = name;
             this.nextText = nextText;
