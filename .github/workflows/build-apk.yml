@@ -28,8 +28,48 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.android"
           base64 -d ci/hamasho-trial-debug.keystore.b64 > "$GITHUB_WORKSPACE/.android/debug.keystore"
 
+      - name: Restore Hamasho photo sprite
+        run: |
+          cat ci/sprite_v091_part1.txt \
+              ci/sprite_v091_part2.txt \
+              ci/sprite_v091_part3.txt \
+              ci/sprite_v091_part4.txt \
+              ci/sprite_v091_part5.txt \
+              ci/sprite_v091_part6.txt \
+            | base64 -d > /tmp/home_sprite_v09_small.jpg
+          test "$(od -An -tx1 -N2 /tmp/home_sprite_v09_small.jpg | tr -d ' \n')" = "ffd8"
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from PIL import Image
+          src = '/tmp/home_sprite_v09_small.jpg'
+          dst = 'app/src/main/res/drawable/home_sprite_v09.jpg'
+          with Image.open(src) as im:
+              im.verify()
+          with Image.open(src) as im:
+              im = im.convert('RGB').resize((800, 940), Image.Resampling.LANCZOS)
+              im.save(dst, 'JPEG', quality=88, optimize=True)
+          with Image.open(dst) as im:
+              assert im.size == (800, 940)
+              im.verify()
+          print('Hamasho photo sprite restored and verified')
+          PY
+          file app/src/main/res/drawable/home_sprite_v09.jpg
+
       - name: Build debug APK with persistent signing home
         run: ANDROID_USER_HOME="$GITHUB_WORKSPACE/.android" gradle :app:assembleDebug --stacktrace
+
+      - name: Verify photo inside APK
+        run: |
+          unzip -p app/build/outputs/apk/debug/app-debug.apk res/drawable/home_sprite_v09.jpg > /tmp/apk_home_sprite.jpg
+          test "$(od -An -tx1 -N2 /tmp/apk_home_sprite.jpg | tr -d ' \n')" = "ffd8"
+          python3 - <<'PY'
+          from PIL import Image
+          p = '/tmp/apk_home_sprite.jpg'
+          with Image.open(p) as im:
+              assert im.size == (800, 940)
+              im.verify()
+          print('APK embedded photo verified')
+          PY
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
