@@ -32,9 +32,9 @@ public class MainActivity extends Activity {
                 String patch = "(function(){"
                         + "var heroLogo=document.querySelector('.hero-logo');if(heroLogo){heroLogo.remove();}"
                         + "var storeLogo=document.querySelector('#store .store-info > div:first-child');"
-                        + "if(storeLogo){storeLogo.innerHTML='<img src=\"hamasho_logo_gold.png\" alt=\"濱匠 Hamasho\" style=\"display:block;width:190px;max-width:72%;height:auto;margin:0 0 10px 0\">';}"
+                        + "if(storeLogo){storeLogo.innerHTML='<img src=\"hamasho_logo_gold.jpg\" alt=\"濱匠 Hamasho\" style=\"display:block;width:190px;max-width:72%;height:auto;margin:0 0 10px 0;border-radius:4px\">';}"
                         + "var memberHead=document.querySelector('.member-card .head');"
-                        + "if(memberHead){memberHead.innerHTML='<img src=\"hamasho_logo_gold.png\" alt=\"濱匠\" style=\"width:88px;height:auto;vertical-align:middle;margin-right:8px\"><span style=\"font-family:sans-serif;letter-spacing:.09em;color:#d8cdbb\">MEMBER</span>';memberHead.style.display='flex';memberHead.style.alignItems='center';}"
+                        + "if(memberHead){memberHead.innerHTML='<img src=\"hamasho_logo_gold.jpg\" alt=\"濱匠\" style=\"width:88px;height:auto;vertical-align:middle;margin-right:8px;border-radius:3px\"><span style=\"font-family:sans-serif;letter-spacing:.09em;color:#d8cdbb\">MEMBER</span>';memberHead.style.display='flex';memberHead.style.alignItems='center';}"
                         + "})();";
                 view.evaluateJavascript(patch, null);
             }
