@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 2
-        versionName '0.2-member'
+        versionCode 3
+        versionName '0.3-qr-staff'
     }
 
     buildTypes {
@@ -19,4 +19,8 @@ android {
             minifyEnabled false
         }
     }
+}
+
+dependencies {
+    implementation 'com.google.zxing:core:3.5.3'
 }
