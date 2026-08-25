@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 13
-        versionName '0.9-real-photo-design'
+        versionCode 14
+        versionName '0.9.1-real-photo-fix'
     }
 
     buildTypes {
