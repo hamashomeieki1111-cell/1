@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
-        header.setPadding(dp(20), dp(16), dp(20), dp(12));
+        header.setPadding(dp(20), dp(14), dp(20), dp(11));
         header.setBackgroundColor(Color.rgb(18, 15, 12));
 
         TextView brand = text("濱匠別邸", 28, GOLD, true);
@@ -77,6 +77,16 @@ public class MainActivity extends Activity {
         TextView tagline = text("蕎麦と酒を、粋に愉しむ。", 12, MUTED, false);
         tagline.setGravity(Gravity.CENTER);
         header.addView(tagline, topMargin(dp(3)));
+
+        TextView demo = text("社長確認用・DEMO", 10, Color.rgb(34, 28, 21), true);
+        demo.setGravity(Gravity.CENTER);
+        demo.setPadding(dp(10), dp(4), dp(10), dp(4));
+        demo.setBackground(roundRect(GOLD, 20));
+        LinearLayout.LayoutParams demoLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        demoLp.gravity = Gravity.CENTER_HORIZONTAL;
+        demoLp.topMargin = dp(7);
+        header.addView(demo, demoLp);
+
         root.addView(header, matchWrap());
 
         ScrollView scroll = new ScrollView(this);
@@ -160,7 +170,16 @@ public class MainActivity extends Activity {
         content.addView(tileRow("季節のおすすめ", "旬の食材・限定料理", "宴会・接待", "コース・お席のご案内"), topMargin(dp(9)));
         content.addView(tileRow("日本酒", "季節酒・おすすめ銘柄", "おすすめドリンク", "ビール・焼酎・ハイボール"), topMargin(dp(10)));
 
-        TextView note = text("v0.4 試作版　店側操作はiPad専用画面へ分離", 11, MUTED, false);
+        content.addView(sectionTitle("導入イメージ"), topMargin(dp(22)));
+        LinearLayout flow = card(CARD, 16);
+        flow.setPadding(dp(18), dp(16), dp(18), dp(16));
+        flow.addView(text("① お客様が会員QRを提示", 15, TEXT, true), matchWrap());
+        flow.addView(text("② 店舗iPadでQRを読み取り", 15, TEXT, true), topMargin(dp(9)));
+        flow.addView(text("③ 会計金額からポイントを付与", 15, TEXT, true), topMargin(dp(9)));
+        flow.addView(text("④ 本番導入時はポイント・クーポンを自動同期", 15, GOLD, true), topMargin(dp(9)));
+        content.addView(flow, topMargin(dp(9)));
+
+        TextView note = text("v0.5 社長確認用　※表示中の会員情報・ポイントはデモデータです", 11, MUTED, false);
         note.setGravity(Gravity.CENTER);
         content.addView(note, topMargin(dp(20)));
     }
@@ -207,6 +226,10 @@ public class MainActivity extends Activity {
         progressCard.addView(text(rank.nextText, 21, TEXT, true), topMargin(dp(7)));
         progressCard.addView(text("粋 0　雅 3,000　匠 10,000　別邸 30,000", 12, MUTED, false), topMargin(dp(10)));
         content.addView(progressCard, topMargin(dp(14)));
+
+        TextView demo = text("※社長確認用のデモ会員です", 11, MUTED, false);
+        demo.setGravity(Gravity.CENTER);
+        content.addView(demo, topMargin(dp(16)));
     }
 
     private void showCoupon() {
@@ -232,6 +255,12 @@ public class MainActivity extends Activity {
         ranks.addView(text("ランク連動", 16, GOLD, true), matchWrap());
         ranks.addView(text("粋　　通常会員クーポン\n雅　　ビール・焼酎・ハイボールから1杯\n匠　　日本酒を含む対象ドリンク1杯\n別邸　対象ドリンク＋季節の一品", 14, TEXT, false), topMargin(dp(12)));
         content.addView(ranks, topMargin(dp(14)));
+
+        LinearLayout note = card(CARD_ALT, 16);
+        note.setPadding(dp(18), dp(16), dp(18), dp(16));
+        note.addView(text("本番では店舗側で内容変更可能", 15, GOLD, true), matchWrap());
+        note.addView(text("季節や販促に合わせて、毎月の特典内容を店舗側で変更できる想定です。", 13, TEXT, false), topMargin(dp(7)));
+        content.addView(note, topMargin(dp(14)));
     }
 
     private void showStore() {
@@ -242,7 +271,7 @@ public class MainActivity extends Activity {
         LinearLayout store = card(CARD_ALT, 18);
         store.setPadding(dp(18), dp(18), dp(18), dp(18));
         store.addView(text("濱匠別邸", 26, GOLD, true), matchWrap());
-        store.addView(text("店舗情報・電話・ネット予約は、実際の情報を確認してから設定します。", 14, TEXT, false), topMargin(dp(10)));
+        store.addView(text("店舗情報・電話・ネット予約は、正式導入時に実際の情報を設定します。", 14, TEXT, false), topMargin(dp(10)));
         content.addView(store, topMargin(dp(12)));
 
         LinearLayout guide = card(CARD, 16);
@@ -250,6 +279,12 @@ public class MainActivity extends Activity {
         guide.addView(text("ポイントご利用について", 16, GOLD, true), matchWrap());
         guide.addView(text("100円（税込）＝1ポイント\n1ポイント＝1円\n300ポイントからご利用いただけます。", 14, TEXT, false), topMargin(dp(10)));
         content.addView(guide, topMargin(dp(14)));
+
+        LinearLayout approval = card(Color.rgb(59, 42, 28), 16);
+        approval.setPadding(dp(18), dp(16), dp(18), dp(16));
+        approval.addView(text("正式導入で追加するもの", 16, GOLD, true), matchWrap());
+        approval.addView(text("・Androidと店舗iPadのリアルタイム同期\n・スタッフ権限管理\n・ポイント付与／使用／取消の履歴\n・会員ごとの安全なデータ管理\n・バックアップ", 14, TEXT, false), topMargin(dp(10)));
+        content.addView(approval, topMargin(dp(14)));
     }
 
     private RankInfo rankInfo(int cumulative) {
@@ -335,7 +370,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    private TextView sectionTitle(String value) { return text(value, 19, GOLD, true); }
+    private TextView sectionTitle(String value) {
+        return text(value, 19, GOLD, true);
+    }
 
     private TextView badge(String value) {
         TextView v = text(value, 13, Color.rgb(34, 28, 21), true);
@@ -404,6 +441,7 @@ public class MainActivity extends Activity {
         final String nextText;
         final int progressValue;
         final int progressMax;
+
         RankInfo(String name, String nextText, int progressValue, int progressMax) {
             this.name = name;
             this.nextText = nextText;
