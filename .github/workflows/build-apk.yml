@@ -23,8 +23,10 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Decode fixed trial signing key
-        run: base64 -d ci/hamasho-trial-debug.keystore.b64 > ci/hamasho-trial-debug.keystore
+      - name: Restore fixed trial debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          base64 -d ci/hamasho-trial-debug.keystore.b64 > "$HOME/.android/debug.keystore"
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
