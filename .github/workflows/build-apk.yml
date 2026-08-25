@@ -23,13 +23,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Restore fixed trial signing keystore
+      - name: Restore persistent demo debug keystore
         run: |
-          base64 -d ci/hamasho-trial-debug.keystore.b64 > ci/hamasho-trial-debug.keystore
-          keytool -list -keystore ci/hamasho-trial-debug.keystore -storepass android -alias androiddebugkey >/dev/null
+          mkdir -p "$GITHUB_WORKSPACE/.android"
+          base64 -d ci/hamasho-trial-debug.keystore.b64 > "$GITHUB_WORKSPACE/.android/debug.keystore"
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Build debug APK with persistent signing home
+        run: ANDROID_USER_HOME="$GITHUB_WORKSPACE/.android" gradle :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
