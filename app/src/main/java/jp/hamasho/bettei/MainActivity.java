@@ -1,16 +1,20 @@
 package jp.hamasho.bettei;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -32,26 +36,32 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
 
-    private static final int BG = Color.rgb(16, 13, 10);
-    private static final int BLACK = Color.rgb(11, 9, 7);
-    private static final int CARD = Color.rgb(31, 25, 20);
-    private static final int CARD_ALT = Color.rgb(43, 34, 26);
-    private static final int WARM = Color.rgb(73, 49, 31);
-    private static final int GOLD = Color.rgb(203, 168, 92);
-    private static final int GOLD_LIGHT = Color.rgb(231, 207, 150);
-    private static final int TEXT = Color.rgb(248, 243, 233);
-    private static final int MUTED = Color.rgb(184, 169, 146);
-    private static final int DIVIDER = Color.rgb(81, 66, 49);
-    private static final int GREEN = Color.rgb(47, 67, 50);
+    private static final int BG = Color.rgb(13, 11, 9);
+    private static final int BLACK = Color.rgb(8, 7, 6);
+    private static final int CARD = Color.rgb(27, 23, 19);
+    private static final int CARD_ALT = Color.rgb(39, 31, 24);
+    private static final int GOLD = Color.rgb(202, 165, 84);
+    private static final int GOLD_LIGHT = Color.rgb(236, 211, 151);
+    private static final int TEXT = Color.rgb(249, 244, 235);
+    private static final int MUTED = Color.rgb(186, 171, 147);
+    private static final int DIVIDER = Color.rgb(78, 63, 45);
 
     private static final String MEMBER_ID = "HMB-000001";
     private static final String SUPABASE_URL = "https://sedprfuiymcgbhatofwb.supabase.co";
     private static final String SUPABASE_KEY = "sb_publishable_BIJQSq4IQRxgwwqWd3YmTQ_etujBnSj";
+
+    private static final String IMG_HERO = "https://hamasho-soba.com/images/shop/hamasho/t.webp";
+    private static final String IMG_SEASON = "https://hamasho-soba.com/images/shop/hamasho/nishikitop.webp";
+    private static final String IMG_BANQUET = "https://hamasho-soba.com/images/shop/hamasho/za.webp";
+    private static final String IMG_SAKE = "https://hamasho-soba.com/images/shop/hamasho/c.webp";
+    private static final String IMG_DRINK = "https://hamasho-soba.com/images/shop/hamasho/t.webp";
 
     private static final int PAGE_HOME = 0;
     private static final int PAGE_MEMBER = 1;
@@ -62,6 +72,8 @@ public class MainActivity extends Activity {
     private Button homeNav, memberNav, couponNav, storeNav;
     private SharedPreferences prefs;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final ExecutorService imageIo = Executors.newFixedThreadPool(3);
+    private final Map<String, Bitmap> imageCache = new ConcurrentHashMap<>();
     private int currentPage = PAGE_HOME;
     private boolean syncing = false;
     private String syncText = "会員情報を確認中…";
@@ -86,6 +98,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         io.shutdownNow();
+        imageIo.shutdownNow();
         super.onDestroy();
     }
 
@@ -108,31 +121,19 @@ public class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.VERTICAL);
         header.setGravity(Gravity.CENTER);
-        header.setPadding(dp(20), dp(14), dp(20), dp(13));
-        header.setBackground(gradient(new int[]{Color.rgb(10, 8, 6), Color.rgb(24, 17, 12)}, 0, 0));
+        header.setPadding(dp(16), dp(9), dp(16), dp(9));
+        header.setBackgroundColor(BLACK);
 
-        TextView english = text("HAMASHO  BETTEI", 9, MUTED, true);
-        english.setGravity(Gravity.CENTER);
-        english.setLetterSpacing(0.22f);
-        header.addView(english, matchWrap());
-
-        TextView brand = text("濱匠別邸", 31, GOLD_LIGHT, true);
+        TextView brand = text("濱匠別邸", 22, GOLD_LIGHT, true);
         brand.setGravity(Gravity.CENTER);
         brand.setTypeface(Typeface.SERIF, Typeface.BOLD);
         brand.setLetterSpacing(0.08f);
-        header.addView(brand, topMargin(dp(3)));
+        header.addView(brand, matchWrap());
 
-        View goldLine = new View(this);
-        goldLine.setBackgroundColor(GOLD);
-        LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(dp(54), dp(1));
-        lineLp.gravity = Gravity.CENTER_HORIZONTAL;
-        lineLp.topMargin = dp(5);
-        header.addView(goldLine, lineLp);
-
-        TextView tagline = text("蕎麦と酒を、粋に愉しむ。", 11, MUTED, false);
+        TextView tagline = text("蕎麦と酒を、粋に愉しむ。", 9, MUTED, false);
         tagline.setGravity(Gravity.CENTER);
-        tagline.setLetterSpacing(0.04f);
-        header.addView(tagline, topMargin(dp(6)));
+        tagline.setLetterSpacing(0.05f);
+        header.addView(tagline, topMargin(dp(2)));
         root.addView(header, matchWrap());
 
         ScrollView scroll = new ScrollView(this);
@@ -140,7 +141,7 @@ public class MainActivity extends Activity {
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(15), dp(14), dp(15), dp(30));
+        content.setPadding(dp(12), dp(10), dp(12), dp(28));
         scroll.addView(content, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -150,10 +151,10 @@ public class MainActivity extends Activity {
         nav.setBackgroundColor(BLACK);
         nav.setFitsSystemWindows(true);
 
-        homeNav = navButton("ホーム");
-        memberNav = navButton("会員証");
-        couponNav = navButton("クーポン");
-        storeNav = navButton("店舗");
+        homeNav = navButton("⌂\nホーム");
+        memberNav = navButton("▣\n会員証");
+        couponNav = navButton("◇\nクーポン");
+        storeNav = navButton("◎\n店舗情報");
         nav.addView(homeNav, weighted());
         nav.addView(memberNav, weighted());
         nav.addView(couponNav, weighted());
@@ -177,100 +178,220 @@ public class MainActivity extends Activity {
         int cumulative = prefs.getInt("cumulative", 0);
         RankInfo rank = rankInfo(cumulative);
 
-        addHero();
+        addHeroPhoto();
 
         LinearLayout memberCard = gradientCard(
-                new int[]{Color.rgb(54, 41, 29), Color.rgb(24, 20, 16)}, 20, GOLD);
-        memberCard.setPadding(dp(19), dp(17), dp(19), dp(17));
+                new int[]{Color.rgb(55, 42, 29), Color.rgb(21, 18, 15)}, 20, GOLD);
+        memberCard.setPadding(dp(18), dp(16), dp(18), dp(16));
         memberCard.setElevation(dp(3));
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView memberLabel = text("MEMBERS CLUB", 10, MUTED, true);
-        memberLabel.setLetterSpacing(0.16f);
+        TextView memberLabel = text("濱匠別邸 MEMBER", 12, TEXT, true);
+        memberLabel.setTypeface(Typeface.SERIF, Typeface.BOLD);
         top.addView(memberLabel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         top.addView(badge(rank.name));
         memberCard.addView(top, matchWrap());
 
-        memberCard.addView(text("現在のポイント", 11, MUTED, false), topMargin(dp(14)));
-        memberCard.addView(text(formatNumber(available) + " pt", 34, GOLD_LIGHT, true), topMargin(dp(1)));
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        left.addView(text("現在ポイント", 10, MUTED, false), matchWrap());
+        left.addView(text(formatNumber(available) + " pt", 31, GOLD_LIGHT, true), topMargin(dp(2)));
+        stats.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setGravity(Gravity.END);
+        TextView cumLabel = text("累計ポイント", 10, MUTED, false);
+        cumLabel.setGravity(Gravity.END);
+        right.addView(cumLabel, matchWrap());
+        TextView cumValue = text(formatNumber(cumulative) + " pt", 20, TEXT, true);
+        cumValue.setGravity(Gravity.END);
+        right.addView(cumValue, topMargin(dp(5)));
+        stats.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        memberCard.addView(stats, topMargin(dp(15)));
 
         addDivider(memberCard, dp(12));
-        LinearLayout smallStats = new LinearLayout(this);
-        smallStats.setOrientation(LinearLayout.HORIZONTAL);
-        smallStats.setGravity(Gravity.CENTER_VERTICAL);
-        smallStats.addView(text("累計  " + formatNumber(cumulative) + " pt", 13, TEXT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        smallStats.addView(text(rank.nextText, 11, MUTED, false));
-        memberCard.addView(smallStats, topMargin(dp(11)));
+        LinearLayout progressText = new LinearLayout(this);
+        progressText.setOrientation(LinearLayout.HORIZONTAL);
+        progressText.addView(text(rank.nextText + "で次ランク", 11, GOLD_LIGHT, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        progressText.addView(text(rank.nextTargetText, 10, MUTED, false));
+        memberCard.addView(progressText, topMargin(dp(10)));
 
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(rank.progressMax);
         progress.setProgress(rank.progressValue);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(GOLD));
         progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(DIVIDER));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(5));
-        p.topMargin = dp(9);
-        memberCard.addView(progress, p);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(6));
+        progressLp.topMargin = dp(8);
+        memberCard.addView(progress, progressLp);
         memberCard.setOnClickListener(v -> showMember());
-        content.addView(memberCard, topMargin(dp(14)));
+        content.addView(memberCard, topMargin(dp(12)));
 
         LinearLayout syncRow = new LinearLayout(this);
         syncRow.setOrientation(LinearLayout.HORIZONTAL);
         syncRow.setGravity(Gravity.CENTER_VERTICAL);
-        syncRow.setPadding(dp(3), dp(8), dp(3), 0);
-        TextView syncStatus = text(syncing ? "会員情報を更新しています…" : syncText, 10, MUTED, false);
+        syncRow.setPadding(dp(3), dp(7), dp(3), 0);
+        TextView syncStatus = text(syncing ? "会員情報を更新しています…" : syncText, 9, Color.rgb(132, 119, 99), false);
         syncRow.addView(syncStatus, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button refresh = miniButton(syncing ? "更新中" : "更新");
         refresh.setEnabled(!syncing);
         refresh.setOnClickListener(v -> syncFromSupabase());
-        syncRow.addView(refresh, new LinearLayout.LayoutParams(dp(72), dp(36)));
+        syncRow.addView(refresh, new LinearLayout.LayoutParams(dp(68), dp(34)));
         content.addView(syncRow, matchWrap());
 
-        content.addView(sectionTitle("今月のおもてなし", "MEMBER BENEFIT"), topMargin(dp(18)));
+        content.addView(sectionTitle("今月のおもてなし", "MEMBER BENEFIT"), topMargin(dp(17)));
         boolean used = prefs.getBoolean("coupon_used", false);
         LinearLayout coupon = gradientCard(
-                used ? new int[]{Color.rgb(43, 39, 34), Color.rgb(30, 27, 24)} : new int[]{Color.rgb(91, 57, 32), Color.rgb(49, 35, 24)},
-                18, used ? DIVIDER : GOLD);
-        coupon.setPadding(dp(19), dp(17), dp(19), dp(17));
-        coupon.addView(text(currentMonth() + "月限定  ｜  " + rank.name + " 会員", 11, GOLD_LIGHT, true), matchWrap());
-        coupon.addView(text(couponText(rank.name), 21, used ? MUTED : TEXT, true), topMargin(dp(7)));
-        coupon.addView(text(used ? "✓  ご利用済み" : "●  今月1回ご利用いただけます", 11, used ? MUTED : GOLD_LIGHT, true), topMargin(dp(12)));
+                used ? new int[]{Color.rgb(42, 39, 35), Color.rgb(27, 25, 22)} : new int[]{Color.rgb(91, 56, 31), Color.rgb(45, 31, 22)},
+                17, used ? DIVIDER : GOLD);
+        coupon.setPadding(dp(17), dp(15), dp(17), dp(15));
+        coupon.addView(text(currentMonth() + "月限定  ｜  " + rank.name + " 会員", 10, GOLD_LIGHT, true), matchWrap());
+        coupon.addView(text(couponText(rank.name), 19, used ? MUTED : TEXT, true), topMargin(dp(6)));
+        coupon.addView(text(used ? "ご利用済み" : "月1回ご利用いただけます", 10, used ? MUTED : GOLD_LIGHT, true), topMargin(dp(9)));
         coupon.setOnClickListener(v -> showCoupon());
-        content.addView(coupon, topMargin(dp(9)));
+        content.addView(coupon, topMargin(dp(8)));
 
-        content.addView(sectionTitle("別邸を愉しむ", "DISCOVER"), topMargin(dp(22)));
-        content.addView(featureRow("旬", "季節のおすすめ", "旬の食材・限定料理", "宴", "宴会・接待", "大切なお席に"), topMargin(dp(9)));
-        content.addView(featureRow("酒", "日本酒", "季節酒・おすすめ銘柄", "杯", "おすすめドリンク", "ビール・焼酎・ハイボール"), topMargin(dp(10)));
+        content.addView(sectionTitle("濱匠別邸を愉しむ", "DISCOVER"), topMargin(dp(20)));
+        content.addView(photoTileRow(
+                IMG_SEASON, "季節のおすすめ", "旬の食材・限定料理",
+                IMG_BANQUET, "宴会・接待", "大切なお席に"), topMargin(dp(8)));
+        content.addView(photoTileRow(
+                IMG_SAKE, "日本酒", "厳選した地酒をご用意",
+                IMG_DRINK, "おすすめドリンク", "ビール・焼酎・ハイボール"), topMargin(dp(9)));
 
-        LinearLayout story = gradientCard(new int[]{Color.rgb(38, 28, 20), Color.rgb(24, 20, 17)}, 17, DIVIDER);
-        story.setPadding(dp(18), dp(17), dp(18), dp(17));
-        TextView kicker = text("HAMASHO BETTEI", 9, GOLD, true);
-        kicker.setLetterSpacing(0.16f);
-        story.addView(kicker, matchWrap());
-        story.addView(text("季節と酒、蕎麦を愉しむ時間。", 19, TEXT, true), topMargin(dp(7)));
-        story.addView(text("一皿ごとの旬と、選りすぐりの酒。\n濱匠別邸ならではのひとときを。", 13, MUTED, false), topMargin(dp(8)));
-        content.addView(story, topMargin(dp(20)));
+        addQuickActions();
+        addReservationCard();
 
-        TextView note = text("社長確認用 DEMO  ｜  v0.7 DESIGN", 9, Color.rgb(112, 100, 84), false);
+        TextView note = text("社長確認用 DEMO  ｜  v0.8 PHOTO DESIGN", 8, Color.rgb(104, 93, 78), false);
         note.setGravity(Gravity.CENTER);
-        note.setLetterSpacing(0.08f);
-        content.addView(note, topMargin(dp(18)));
+        note.setLetterSpacing(0.07f);
+        content.addView(note, topMargin(dp(16)));
     }
 
-    private void addHero() {
-        LinearLayout hero = gradientCard(
-                new int[]{Color.rgb(84, 53, 30), Color.rgb(45, 30, 21), Color.rgb(20, 17, 14)}, 22, Color.rgb(112, 86, 52));
-        hero.setPadding(dp(20), dp(22), dp(20), dp(20));
-        hero.setMinimumHeight(dp(154));
-        hero.setGravity(Gravity.BOTTOM);
+    private void addHeroPhoto() {
+        FrameLayout hero = new FrameLayout(this);
+        hero.setBackground(roundRect(Color.rgb(42, 31, 23), 20));
+        hero.setClipToOutline(true);
+        hero.setMinimumHeight(dp(220));
 
-        TextView season = text("SEASONAL  TABLE", 9, GOLD_LIGHT, true);
-        season.setLetterSpacing(0.18f);
-        hero.addView(season, matchWrap());
-        hero.addView(text("季節を味わう、\n別邸の夜。", 28, TEXT, true), topMargin(dp(7)));
-        hero.addView(text("蕎麦  ｜  酒  ｜  旬菜", 12, GOLD_LIGHT, false), topMargin(dp(10)));
+        ImageView image = remoteImage(IMG_HERO);
+        hero.addView(image, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(220)));
+
+        View shade = new View(this);
+        shade.setBackground(gradient(new int[]{Color.argb(30, 0, 0, 0), Color.argb(190, 0, 0, 0)}, 0, 0));
+        hero.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(220)));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(18), dp(14), dp(18), dp(18));
+        FrameLayout.LayoutParams copyLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+
+        TextView kicker = text("本格串焼とへぎそば", 11, GOLD_LIGHT, true);
+        kicker.setLetterSpacing(0.06f);
+        copy.addView(kicker, matchWrap());
+        TextView title = text("濱匠別邸", 34, Color.WHITE, true);
+        title.setTypeface(Typeface.SERIF, Typeface.BOLD);
+        title.setLetterSpacing(0.08f);
+        copy.addView(title, topMargin(dp(2)));
+        copy.addView(text("四季の恵みを繊細に。\n名駅で味わう上質なひととき。", 12, Color.rgb(240, 231, 216), false), topMargin(dp(6)));
+        hero.addView(copy, copyLp);
+
         content.addView(hero, matchWrap());
+    }
+
+    private LinearLayout photoTileRow(String url1, String title1, String sub1, String url2, String title2, String sub2) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, dp(150), 1f);
+        lp1.rightMargin = dp(4);
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, dp(150), 1f);
+        lp2.leftMargin = dp(4);
+        row.addView(photoTile(url1, title1, sub1), lp1);
+        row.addView(photoTile(url2, title2, sub2), lp2);
+        return row;
+    }
+
+    private FrameLayout photoTile(String url, String title, String sub) {
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackground(roundRect(CARD_ALT, 16));
+        frame.setClipToOutline(true);
+
+        ImageView image = remoteImage(url);
+        frame.addView(image, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        View shade = new View(this);
+        shade.setBackground(gradient(new int[]{Color.argb(8, 0, 0, 0), Color.argb(210, 0, 0, 0)}, 0, 0));
+        frame.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(12), dp(10), dp(12), dp(12));
+        labels.addView(text(title, 17, Color.WHITE, true), matchWrap());
+        labels.addView(text(sub, 9, Color.rgb(235, 226, 212), false), topMargin(dp(3)));
+        FrameLayout.LayoutParams labelLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+        frame.addView(labels, labelLp);
+        return frame;
+    }
+
+    private void addQuickActions() {
+        LinearLayout box = gradientCard(new int[]{Color.rgb(24, 21, 18), Color.rgb(16, 14, 12)}, 16, DIVIDER);
+        box.setPadding(dp(5), dp(10), dp(5), dp(10));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.addView(quickAction("◇", "クーポン", v -> showCoupon()), weighted());
+        row.addView(quickAction("▣", "会員証", v -> showMember()), weighted());
+        row.addView(quickAction("☎", "予約", v -> showStore()), weighted());
+        row.addView(quickAction("◎", "店舗情報", v -> showStore()), weighted());
+        box.addView(row, matchWrap());
+        content.addView(box, topMargin(dp(14)));
+    }
+
+    private LinearLayout quickAction(String mark, String label, View.OnClickListener listener) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setPadding(dp(2), dp(5), dp(2), dp(5));
+        TextView icon = text(mark, 22, GOLD, true);
+        icon.setGravity(Gravity.CENTER);
+        box.addView(icon, matchWrap());
+        TextView name = text(label, 9, TEXT, true);
+        name.setGravity(Gravity.CENTER);
+        box.addView(name, topMargin(dp(3)));
+        box.setOnClickListener(listener);
+        return box;
+    }
+
+    private void addReservationCard() {
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackground(roundRect(Color.rgb(40, 30, 22), 17));
+        frame.setClipToOutline(true);
+        frame.setMinimumHeight(dp(116));
+
+        ImageView image = remoteImage(IMG_BANQUET);
+        frame.addView(image, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)));
+        View shade = new View(this);
+        shade.setBackgroundColor(Color.argb(145, 0, 0, 0));
+        frame.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setGravity(Gravity.CENTER);
+        labels.setPadding(dp(15), dp(12), dp(15), dp(12));
+        TextView title = text("ご宴会・ご会食のご予約承り中", 18, Color.WHITE, true);
+        title.setGravity(Gravity.CENTER);
+        labels.addView(title, matchWrap());
+        TextView sub = text("季節のコース料理・個室のご相談はこちら", 10, GOLD_LIGHT, false);
+        sub.setGravity(Gravity.CENTER);
+        labels.addView(sub, topMargin(dp(5)));
+        frame.addView(labels, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(116)));
+        frame.setOnClickListener(v -> showStore());
+        content.addView(frame, topMargin(dp(13)));
     }
 
     private void showMember() {
@@ -284,23 +405,21 @@ public class MainActivity extends Activity {
 
         content.addView(pageHeading("会員証", "MEMBERS CARD"), matchWrap());
 
-        LinearLayout memberCard = gradientCard(
-                new int[]{Color.rgb(74, 55, 37), Color.rgb(29, 24, 19)}, 22, GOLD);
-        memberCard.setPadding(dp(20), dp(20), dp(20), dp(20));
+        LinearLayout memberCard = gradientCard(new int[]{Color.rgb(66, 49, 33), Color.rgb(24, 20, 16)}, 21, GOLD);
+        memberCard.setPadding(dp(19), dp(18), dp(19), dp(18));
         memberCard.setElevation(dp(3));
 
         LinearLayout first = new LinearLayout(this);
         first.setOrientation(LinearLayout.HORIZONTAL);
         first.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = text("HAMASHO BETTEI", 10, MUTED, true);
-        label.setLetterSpacing(0.16f);
+        TextView label = text("濱匠別邸 MEMBER", 12, TEXT, true);
+        label.setTypeface(Typeface.SERIF, Typeface.BOLD);
         first.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         first.addView(badge(rank.name));
         memberCard.addView(first, matchWrap());
-
-        memberCard.addView(text(rank.name + " 会員", 31, GOLD_LIGHT, true), topMargin(dp(15)));
+        memberCard.addView(text(rank.name + " 会員", 29, GOLD_LIGHT, true), topMargin(dp(14)));
         memberCard.addView(text("MEMBER ID  " + MEMBER_ID, 10, MUTED, false), topMargin(dp(4)));
-        addDivider(memberCard, dp(16));
+        addDivider(memberCard, dp(14));
 
         LinearLayout stats = new LinearLayout(this);
         stats.setOrientation(LinearLayout.HORIZONTAL);
@@ -309,43 +428,41 @@ public class MainActivity extends Activity {
         divider.setBackgroundColor(DIVIDER);
         stats.addView(divider, new LinearLayout.LayoutParams(dp(1), dp(46)));
         stats.addView(stat(formatNumber(cumulative) + " pt", "累計ポイント"), weighted());
-        memberCard.addView(stats, topMargin(dp(15)));
-        content.addView(memberCard, topMargin(dp(13)));
+        memberCard.addView(stats, topMargin(dp(14)));
+        content.addView(memberCard, topMargin(dp(12)));
 
-        LinearLayout qrOuter = gradientCard(new int[]{Color.rgb(46, 37, 29), Color.rgb(28, 24, 20)}, 20, DIVIDER);
-        qrOuter.setPadding(dp(14), dp(14), dp(14), dp(16));
+        LinearLayout qrOuter = gradientCard(new int[]{Color.rgb(42, 34, 27), Color.rgb(25, 21, 18)}, 19, DIVIDER);
+        qrOuter.setPadding(dp(13), dp(13), dp(13), dp(15));
         qrOuter.setGravity(Gravity.CENTER);
-
-        LinearLayout qrCard = card(Color.WHITE, 16);
+        LinearLayout qrCard = card(Color.WHITE, 15);
         qrCard.setGravity(Gravity.CENTER);
-        qrCard.setPadding(dp(14), dp(14), dp(14), dp(14));
+        qrCard.setPadding(dp(12), dp(12), dp(12), dp(12));
         ImageView qr = new ImageView(this);
         Bitmap bitmap = makeQr("HAMASHO_MEMBER:" + MEMBER_ID, 760);
         if (bitmap != null) qr.setImageBitmap(bitmap);
         qrCard.addView(qr, new LinearLayout.LayoutParams(dp(224), dp(224)));
-        qrOuter.addView(qrCard, new LinearLayout.LayoutParams(dp(260), dp(260)));
-
-        TextView qrLabel = text("会計時にこちらのQRをご提示ください", 12, TEXT, true);
+        qrOuter.addView(qrCard, new LinearLayout.LayoutParams(dp(254), dp(254)));
+        TextView qrLabel = text("会計時にこちらのQRをご提示ください", 11, TEXT, true);
         qrLabel.setGravity(Gravity.CENTER);
-        qrOuter.addView(qrLabel, topMargin(dp(12)));
-        content.addView(qrOuter, topMargin(dp(14)));
+        qrOuter.addView(qrLabel, topMargin(dp(11)));
+        content.addView(qrOuter, topMargin(dp(13)));
 
         addRefreshButton();
 
-        LinearLayout progressCard = gradientCard(new int[]{CARD_ALT, CARD}, 17, DIVIDER);
-        progressCard.setPadding(dp(18), dp(17), dp(18), dp(17));
-        progressCard.addView(text("次のランクまで", 11, GOLD, true), matchWrap());
-        progressCard.addView(text(rank.nextText, 20, TEXT, true), topMargin(dp(5)));
+        LinearLayout progressCard = gradientCard(new int[]{CARD_ALT, CARD}, 16, DIVIDER);
+        progressCard.setPadding(dp(17), dp(16), dp(17), dp(16));
+        progressCard.addView(text("次のランクまで", 10, GOLD, true), matchWrap());
+        progressCard.addView(text(rank.nextText + "でランクアップ", 18, TEXT, true), topMargin(dp(4)));
         ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(rank.progressMax);
         progress.setProgress(rank.progressValue);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(GOLD));
         progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(DIVIDER));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(5));
-        lp.topMargin = dp(12);
+        lp.topMargin = dp(10);
         progressCard.addView(progress, lp);
-        progressCard.addView(text("粋  0　｜　雅  3,000　｜　匠  10,000　｜　別邸  30,000", 10, MUTED, false), topMargin(dp(10)));
-        content.addView(progressCard, topMargin(dp(14)));
+        progressCard.addView(text("粋 0　｜　雅 3,000　｜　匠 10,000　｜　別邸 30,000", 9, MUTED, false), topMargin(dp(9)));
+        content.addView(progressCard, topMargin(dp(13)));
     }
 
     private void showCoupon() {
@@ -358,25 +475,25 @@ public class MainActivity extends Activity {
         content.addView(pageHeading("会員クーポン", "MONTHLY BENEFIT"), matchWrap());
 
         LinearLayout coupon = gradientCard(
-                used ? new int[]{Color.rgb(45, 42, 38), Color.rgb(29, 27, 24)} : new int[]{Color.rgb(103, 63, 32), Color.rgb(49, 34, 23)},
-                22, used ? DIVIDER : GOLD);
-        coupon.setPadding(dp(21), dp(21), dp(21), dp(21));
-        coupon.addView(text(currentMonth() + "月  MEMBER'S SPECIAL", 11, GOLD_LIGHT, true), matchWrap());
-        coupon.addView(text(rank.name + " 会員様限定", 27, TEXT, true), topMargin(dp(8)));
-        coupon.addView(text(couponText(rank.name), 22, used ? MUTED : GOLD_LIGHT, true), topMargin(dp(12)));
-        addDivider(coupon, dp(18));
-        coupon.addView(text(used ? "✓  使用済み" : "●  ご利用いただけます", 17, used ? MUTED : TEXT, true), topMargin(dp(14)));
-        coupon.addView(text("有効期限：" + currentMonth() + "月末まで\n利用回数：月1回\n※使用確定は店舗スタッフが行います", 13, MUTED, false), topMargin(dp(10)));
-        content.addView(coupon, topMargin(dp(14)));
+                used ? new int[]{Color.rgb(43, 40, 36), Color.rgb(28, 26, 23)} : new int[]{Color.rgb(101, 62, 31), Color.rgb(46, 32, 22)},
+                21, used ? DIVIDER : GOLD);
+        coupon.setPadding(dp(20), dp(20), dp(20), dp(20));
+        coupon.addView(text(currentMonth() + "月  MEMBER'S SPECIAL", 10, GOLD_LIGHT, true), matchWrap());
+        coupon.addView(text(rank.name + " 会員様限定", 25, TEXT, true), topMargin(dp(7)));
+        coupon.addView(text(couponText(rank.name), 21, used ? MUTED : GOLD_LIGHT, true), topMargin(dp(11)));
+        addDivider(coupon, dp(16));
+        coupon.addView(text(used ? "使用済み" : "ご利用いただけます", 16, used ? MUTED : TEXT, true), topMargin(dp(13)));
+        coupon.addView(text("有効期限：" + currentMonth() + "月末まで\n利用回数：月1回\n※使用確定は店舗スタッフが行います", 12, MUTED, false), topMargin(dp(9)));
+        content.addView(coupon, topMargin(dp(13)));
 
         addRefreshButton();
 
-        LinearLayout ranks = gradientCard(new int[]{CARD_ALT, CARD}, 17, DIVIDER);
-        ranks.setPadding(dp(18), dp(17), dp(18), dp(17));
-        ranks.addView(text("RANK BENEFITS", 9, GOLD, true), matchWrap());
-        ranks.addView(text("ランクごとのおもてなし", 18, TEXT, true), topMargin(dp(5)));
-        ranks.addView(text("粋　　通常会員クーポン\n雅　　ビール・焼酎・ハイボールから1杯\n匠　　日本酒を含む対象ドリンク1杯\n別邸　対象ドリンク1杯＋季節の一品", 13, MUTED, false), topMargin(dp(12)));
-        content.addView(ranks, topMargin(dp(14)));
+        LinearLayout ranks = gradientCard(new int[]{CARD_ALT, CARD}, 16, DIVIDER);
+        ranks.setPadding(dp(17), dp(16), dp(17), dp(16));
+        ranks.addView(text("RANK BENEFITS", 8, GOLD, true), matchWrap());
+        ranks.addView(text("ランクごとのおもてなし", 17, TEXT, true), topMargin(dp(4)));
+        ranks.addView(text("粋　　通常会員クーポン\n雅　　ビール・焼酎・ハイボールから1杯\n匠　　日本酒を含む対象ドリンク1杯\n別邸　対象ドリンク1杯＋季節の一品", 12, MUTED, false), topMargin(dp(10)));
+        content.addView(ranks, topMargin(dp(13)));
     }
 
     private void showStore() {
@@ -385,70 +502,99 @@ public class MainActivity extends Activity {
         selectNav(storeNav);
         content.addView(pageHeading("店舗・予約", "HAMASHO BETTEI"), matchWrap());
 
-        LinearLayout store = gradientCard(new int[]{Color.rgb(70, 47, 30), Color.rgb(29, 23, 18)}, 21, GOLD);
-        store.setPadding(dp(20), dp(22), dp(20), dp(22));
-        TextView english = text("SOBA  &  SAKE", 9, GOLD_LIGHT, true);
-        english.setLetterSpacing(0.18f);
-        store.addView(english, matchWrap());
-        TextView name = text("濱匠別邸", 29, TEXT, true);
-        name.setTypeface(Typeface.SERIF, Typeface.BOLD);
-        store.addView(name, topMargin(dp(7)));
-        store.addView(text("店舗情報・電話・ネット予約は、正式導入時に実際の情報へ設定します。", 13, MUTED, false), topMargin(dp(11)));
-        content.addView(store, topMargin(dp(14)));
+        FrameLayout photo = new FrameLayout(this);
+        photo.setBackground(roundRect(CARD_ALT, 18));
+        photo.setClipToOutline(true);
+        ImageView storeImage = remoteImage(IMG_HERO);
+        photo.addView(storeImage, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(165)));
+        View shade = new View(this);
+        shade.setBackgroundColor(Color.argb(105, 0, 0, 0));
+        photo.addView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(165)));
+        LinearLayout photoCopy = new LinearLayout(this);
+        photoCopy.setOrientation(LinearLayout.VERTICAL);
+        photoCopy.setPadding(dp(16), dp(12), dp(16), dp(15));
+        photoCopy.addView(text("濱匠 名駅別邸", 25, Color.WHITE, true), matchWrap());
+        photoCopy.addView(text("四季の恵みを繊細に。名駅で味わう上質なひととき。", 10, GOLD_LIGHT, false), topMargin(dp(4)));
+        photo.addView(photoCopy, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
+        content.addView(photo, topMargin(dp(12)));
 
-        LinearLayout guide = gradientCard(new int[]{CARD_ALT, CARD}, 17, DIVIDER);
-        guide.setPadding(dp(18), dp(17), dp(18), dp(17));
-        guide.addView(text("ポイントのご利用", 17, GOLD_LIGHT, true), matchWrap());
-        guide.addView(text("100円（税込）＝ 1ポイント\n1ポイント ＝ 1円\n300ポイントからご利用いただけます。", 14, TEXT, false), topMargin(dp(10)));
-        content.addView(guide, topMargin(dp(14)));
+        LinearLayout info = gradientCard(new int[]{Color.rgb(49, 37, 27), Color.rgb(25, 21, 17)}, 17, DIVIDER);
+        info.setPadding(dp(17), dp(16), dp(17), dp(16));
+        info.addView(text("〒450-0002\n愛知県名古屋市中村区名駅2-41-3\nサンエスケービル1階", 13, TEXT, false), matchWrap());
+        info.addView(text("JR名古屋駅 徒歩5分", 11, GOLD_LIGHT, true), topMargin(dp(8)));
+        info.addView(text("月〜金 11:30〜14:00\n月〜土 17:00〜23:00\n定休日：日曜（不定休あり）", 12, MUTED, false), topMargin(dp(11)));
+        content.addView(info, topMargin(dp(12)));
 
-        LinearLayout demo = card(Color.rgb(26, 23, 20), 15);
-        demo.setPadding(dp(16), dp(14), dp(16), dp(14));
-        demo.addView(text("DEMO VERSION", 9, Color.rgb(128, 113, 92), true), matchWrap());
-        demo.addView(text("現在は社長確認用の試作版です。", 12, MUTED, false), topMargin(dp(4)));
-        content.addView(demo, topMargin(dp(14)));
+        Button call = primaryButton("電話で予約  052-583-8040");
+        call.setOnClickListener(v -> dial("0525838040"));
+        content.addView(call, topMargin(dp(12)));
+        Button web = secondaryButton("公式ページを見る");
+        web.setOnClickListener(v -> openUrl("https://hamasho-soba.com/hamasho-meieki.html"));
+        content.addView(web, topMargin(dp(8)));
+
+        LinearLayout guide = gradientCard(new int[]{CARD_ALT, CARD}, 16, DIVIDER);
+        guide.setPadding(dp(17), dp(16), dp(17), dp(16));
+        guide.addView(text("ポイントのご利用", 16, GOLD_LIGHT, true), matchWrap());
+        guide.addView(text("100円（税込）＝ 1ポイント\n1ポイント ＝ 1円\n300ポイントからご利用いただけます。", 13, TEXT, false), topMargin(dp(9)));
+        content.addView(guide, topMargin(dp(13)));
+    }
+
+    private ImageView remoteImage(String url) {
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setBackgroundColor(Color.rgb(54, 43, 32));
+        loadRemoteImage(image, url);
+        return image;
+    }
+
+    private void loadRemoteImage(ImageView view, String url) {
+        view.setTag(url);
+        Bitmap cached = imageCache.get(url);
+        if (cached != null) {
+            view.setImageBitmap(cached);
+            return;
+        }
+        imageIo.execute(() -> {
+            HttpURLConnection conn = null;
+            try {
+                conn = (HttpURLConnection) new URL(url).openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 HamashoBetteiApp/0.8");
+                conn.setDoInput(true);
+                conn.connect();
+                if (conn.getResponseCode() < 200 || conn.getResponseCode() >= 300) return;
+                Bitmap bitmap = BitmapFactory.decodeStream(conn.getInputStream());
+                if (bitmap == null) return;
+                imageCache.put(url, bitmap);
+                runOnUiThread(() -> {
+                    Object tag = view.getTag();
+                    if (tag != null && url.equals(tag.toString())) view.setImageBitmap(bitmap);
+                });
+            } catch (Exception ignored) {
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        });
     }
 
     private LinearLayout pageHeading(String jp, String en) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        TextView english = text(en, 9, GOLD, true);
+        TextView english = text(en, 8, GOLD, true);
         english.setLetterSpacing(0.17f);
         box.addView(english, matchWrap());
-        box.addView(text(jp, 25, TEXT, true), topMargin(dp(3)));
+        box.addView(text(jp, 24, TEXT, true), topMargin(dp(2)));
         return box;
     }
 
     private LinearLayout sectionTitle(String jp, String en) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        TextView english = text(en, 8, Color.rgb(149, 125, 80), true);
-        english.setLetterSpacing(0.17f);
+        TextView english = text(en, 8, Color.rgb(148, 124, 78), true);
+        english.setLetterSpacing(0.15f);
         box.addView(english, matchWrap());
-        box.addView(text(jp, 19, GOLD_LIGHT, true), topMargin(dp(2)));
-        return box;
-    }
-
-    private LinearLayout featureRow(String aMark, String aTitle, String aSub, String bMark, String bTitle, String bSub) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams aLp = new LinearLayout.LayoutParams(0, dp(136), 1f);
-        aLp.rightMargin = dp(5);
-        LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(0, dp(136), 1f);
-        bLp.leftMargin = dp(5);
-        row.addView(featureTile(aMark, aTitle, aSub), aLp);
-        row.addView(featureTile(bMark, bTitle, bSub), bLp);
-        return row;
-    }
-
-    private LinearLayout featureTile(String mark, String title, String sub) {
-        LinearLayout box = gradientCard(new int[]{Color.rgb(56, 40, 28), Color.rgb(28, 23, 19)}, 18, Color.rgb(77, 62, 45));
-        box.setPadding(dp(15), dp(13), dp(15), dp(14));
-        TextView symbol = text(mark, 29, GOLD, true);
-        symbol.setTypeface(Typeface.SERIF, Typeface.BOLD);
-        box.addView(symbol, matchWrap());
-        box.addView(text(title, 16, TEXT, true), topMargin(dp(8)));
-        box.addView(text(sub, 10, MUTED, false), topMargin(dp(3)));
+        box.addView(text(jp, 18, GOLD_LIGHT, true), topMargin(dp(1)));
         return box;
     }
 
@@ -456,26 +602,64 @@ public class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView status = text(syncing ? "更新しています…" : syncText, 10, MUTED, false);
+        TextView status = text(syncing ? "更新しています…" : syncText, 9, MUTED, false);
         row.addView(status, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button b = miniButton(syncing ? "更新中" : "最新に更新");
         b.setEnabled(!syncing);
         b.setOnClickListener(v -> syncFromSupabase());
-        row.addView(b, new LinearLayout.LayoutParams(dp(104), dp(38)));
-        content.addView(row, topMargin(dp(12)));
+        row.addView(b, new LinearLayout.LayoutParams(dp(100), dp(36)));
+        content.addView(row, topMargin(dp(11)));
     }
 
     private Button miniButton(String label) {
         Button b = new Button(this);
         b.setText(label);
-        b.setTextSize(11);
+        b.setTextSize(10);
         b.setAllCaps(false);
         b.setTextColor(GOLD_LIGHT);
         b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setBackground(outlineRect(Color.rgb(28, 23, 19), GOLD, 12));
-        b.setPadding(dp(8), 0, dp(8), 0);
+        b.setBackground(outlineRect(Color.rgb(27, 22, 18), GOLD, 11));
+        b.setPadding(dp(7), 0, dp(7), 0);
         b.setStateListAnimator(null);
         return b;
+    }
+
+    private Button primaryButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(14);
+        b.setAllCaps(false);
+        b.setTextColor(Color.rgb(35, 27, 18));
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setBackground(gradient(new int[]{GOLD_LIGHT, GOLD}, 13, 0));
+        b.setStateListAnimator(null);
+        return b;
+    }
+
+    private Button secondaryButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(13);
+        b.setAllCaps(false);
+        b.setTextColor(GOLD_LIGHT);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setBackground(outlineRect(Color.rgb(25, 21, 17), GOLD, 13));
+        b.setStateListAnimator(null);
+        return b;
+    }
+
+    private void dial(String phone) {
+        try {
+            startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone)));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void openUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception ignored) {
+        }
     }
 
     private void syncFromSupabase() {
@@ -552,10 +736,10 @@ public class MainActivity extends Activity {
     }
 
     private RankInfo rankInfo(int cumulative) {
-        if (cumulative >= 30000) return new RankInfo("別邸", "最高ランク", 30000, 30000);
-        if (cumulative >= 10000) return new RankInfo("匠", "あと " + formatNumber(30000 - cumulative) + " pt", cumulative - 10000, 20000);
-        if (cumulative >= 3000) return new RankInfo("雅", "あと " + formatNumber(10000 - cumulative) + " pt", cumulative - 3000, 7000);
-        return new RankInfo("粋", "あと " + formatNumber(3000 - cumulative) + " pt", cumulative, 3000);
+        if (cumulative >= 30000) return new RankInfo("別邸", "最高ランク", 30000, 30000, "30,000 pt");
+        if (cumulative >= 10000) return new RankInfo("匠", "あと " + formatNumber(30000 - cumulative) + " pt", cumulative - 10000, 20000, "30,000 pt");
+        if (cumulative >= 3000) return new RankInfo("雅", "あと " + formatNumber(10000 - cumulative) + " pt", cumulative - 3000, 7000, "10,000 pt");
+        return new RankInfo("粋", "あと " + formatNumber(3000 - cumulative) + " pt", cumulative, 3000, "3,000 pt");
     }
 
     private String couponText(String rank) {
@@ -587,21 +771,24 @@ public class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
-        box.addView(text(value, 20, GOLD_LIGHT, true), matchWrap());
-        TextView l = text(label, 10, MUTED, false);
+        TextView v = text(value, 19, GOLD_LIGHT, true);
+        v.setGravity(Gravity.CENTER);
+        box.addView(v, matchWrap());
+        TextView l = text(label, 9, MUTED, false);
         l.setGravity(Gravity.CENTER);
-        box.addView(l, topMargin(dp(4)));
+        box.addView(l, topMargin(dp(3)));
         return box;
     }
 
     private Button navButton(String label) {
         Button b = new Button(this);
         b.setText(label);
-        b.setTextSize(11);
+        b.setGravity(Gravity.CENTER);
+        b.setTextSize(9);
         b.setAllCaps(false);
         b.setTextColor(MUTED);
         b.setBackgroundColor(Color.TRANSPARENT);
-        b.setPadding(0, dp(8), 0, dp(8));
+        b.setPadding(0, dp(4), 0, dp(4));
         b.setStateListAnimator(null);
         return b;
     }
@@ -611,14 +798,14 @@ public class MainActivity extends Activity {
         for (Button b : all) {
             b.setTextColor(b == selected ? GOLD_LIGHT : MUTED);
             b.setTypeface(Typeface.DEFAULT, b == selected ? Typeface.BOLD : Typeface.NORMAL);
-            b.setBackground(b == selected ? outlineRect(Color.rgb(28, 22, 17), Color.rgb(70, 55, 38), 11) : null);
+            b.setBackground(b == selected ? outlineRect(Color.rgb(25, 20, 16), Color.rgb(67, 52, 36), 10) : null);
         }
     }
 
     private TextView badge(String value) {
-        TextView v = text(value, 14, Color.rgb(34, 26, 17), true);
+        TextView v = text(value, 13, Color.rgb(34, 26, 17), true);
         v.setGravity(Gravity.CENTER);
-        v.setPadding(dp(13), dp(5), dp(13), dp(5));
+        v.setPadding(dp(12), dp(4), dp(12), dp(4));
         v.setBackground(gradient(new int[]{GOLD_LIGHT, GOLD}, 18, 0));
         return v;
     }
@@ -706,12 +893,14 @@ public class MainActivity extends Activity {
         final String nextText;
         final int progressValue;
         final int progressMax;
+        final String nextTargetText;
 
-        RankInfo(String name, String nextText, int progressValue, int progressMax) {
+        RankInfo(String name, String nextText, int progressValue, int progressMax, String nextTargetText) {
             this.name = name;
             this.nextText = nextText;
             this.progressValue = Math.max(0, progressValue);
             this.progressMax = Math.max(1, progressMax);
+            this.nextTargetText = nextTargetText;
         }
     }
 }
