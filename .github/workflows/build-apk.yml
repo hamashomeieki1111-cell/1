@@ -28,11 +28,11 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.android"
           base64 -d ci/hamasho-trial-debug.keystore.b64 > "$GITHUB_WORKSPACE/.android/debug.keystore"
 
-      - name: Verify official Hamasho SVG logo source
+      - name: Verify horizontal Hamasho SVG logo source
         run: |
           test -s app/src/main/assets/hamasho_logo_gold.svg
           grep -q '<svg' app/src/main/assets/hamasho_logo_gold.svg
-          grep -q '濱匠 Hamasho' app/src/main/assets/hamasho_logo_gold.svg
+          grep -q 'fill="#ffffff"' app/src/main/assets/hamasho_logo_gold.svg
 
       - name: Restore Hamasho photo sprite
         run: |
@@ -76,7 +76,7 @@ jobs:
           test "$(od -An -tx1 -N2 /tmp/apk_home_sprite.jpg | tr -d ' \n')" = "ffd8"
           test -s /tmp/apk_logo.svg
           grep -q '<svg' /tmp/apk_logo.svg
-          grep -q '濱匠 Hamasho' /tmp/apk_logo.svg
+          grep -q 'fill="#ffffff"' /tmp/apk_logo.svg
           test -s /tmp/apk_index.html
           grep -q "季節のおすすめ" /tmp/apk_index.html
           grep -q "濱匠" /tmp/apk_index.html
@@ -85,7 +85,7 @@ jobs:
           with Image.open('/tmp/apk_home_sprite.jpg') as im:
               assert im.size == (800, 940)
               im.verify()
-          print('APK original-design HTML, photos and official SVG logo verified')
+          print('APK original-design HTML, photos and horizontal logo verified')
           PY
 
       - name: Upload APK
