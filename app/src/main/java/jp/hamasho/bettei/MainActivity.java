@@ -1,9 +1,12 @@
 package jp.hamasho.bettei;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -26,6 +29,21 @@ public class MainActivity extends Activity {
         web.getSettings().setAllowFileAccessFromFileURLs(true);
         web.getSettings().setAllowUniversalAccessFromFileURLs(true);
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme();
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                        return true;
+                    } catch (Exception ignored) {
+                        return false;
+                    }
+                }
+                return false;
+            }
+
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
