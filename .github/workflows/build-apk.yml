@@ -65,14 +65,34 @@ jobs:
           print('Hamasho photo sprite restored to drawable and WebView assets')
           PY
 
+      - name: Restore exact Meieki Bettei launcher icon
+        run: |
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          cat ci/icon_v1011_part1.txt \
+              ci/icon_v1011_part2.txt \
+              ci/icon_v1011_part3.txt \
+              ci/icon_v1011_part4.txt \
+            | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
+          echo "19fbd696f690b101136d932e7c44d52c9dc63c6139dbfeb443f4605594ef4bbe  app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" | sha256sum -c -
+          python3 - <<'PY'
+          from PIL import Image
+          p='app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp'
+          with Image.open(p) as im:
+              assert im.size == (192, 192), im.size
+              assert im.format == 'WEBP', im.format
+              im.verify()
+          print('Exact round Meieki Bettei launcher icon restored and verified')
+          PY
+
       - name: Build debug APK with persistent signing home
         run: ANDROID_USER_HOME="$GITHUB_WORKSPACE/.android" gradle :app:assembleDebug --stacktrace
 
-      - name: Verify original-design assets inside APK
+      - name: Verify app assets and launcher icon inside APK
         run: |
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/home_sprite_v09.jpg > /tmp/apk_home_sprite.jpg
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/hamasho_logo_gold.svg > /tmp/apk_logo.svg
-          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/index.html > /tmp/apk_index.html
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          unzip -p "$APK" assets/home_sprite_v09.jpg > /tmp/apk_home_sprite.jpg
+          unzip -p "$APK" assets/hamasho_logo_gold.svg > /tmp/apk_logo.svg
+          unzip -p "$APK" assets/index.html > /tmp/apk_index.html
           test "$(od -An -tx1 -N2 /tmp/apk_home_sprite.jpg | tr -d ' \n')" = "ffd8"
           test -s /tmp/apk_logo.svg
           grep -q '<svg' /tmp/apk_logo.svg
@@ -80,12 +100,22 @@ jobs:
           test -s /tmp/apk_index.html
           grep -q "季節のおすすめ" /tmp/apk_index.html
           grep -q "濱匠" /tmp/apk_index.html
+
+          ICON_PATH="$(unzip -Z1 "$APK" | grep -E '^res/.*/ic_launcher\.webp$' | head -n 1)"
+          test -n "$ICON_PATH"
+          unzip -p "$APK" "$ICON_PATH" > /tmp/apk_ic_launcher.webp
+          echo "19fbd696f690b101136d932e7c44d52c9dc63c6139dbfeb443f4605594ef4bbe  /tmp/apk_ic_launcher.webp" | sha256sum -c -
+
           python3 - <<'PY'
           from PIL import Image
           with Image.open('/tmp/apk_home_sprite.jpg') as im:
               assert im.size == (800, 940)
               im.verify()
-          print('APK original-design HTML, photos and horizontal logo verified')
+          with Image.open('/tmp/apk_ic_launcher.webp') as im:
+              assert im.size == (192, 192), im.size
+              assert im.format == 'WEBP', im.format
+              im.verify()
+          print('APK photos, logo, HTML and exact launcher icon verified')
           PY
 
       - name: Upload APK
