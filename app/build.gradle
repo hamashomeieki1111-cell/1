@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 25
-        versionName '1.0.10-meieki-bettei-round-webp-icon'
+        versionCode 26
+        versionName '1.0.11-meieki-bettei-icon-fixed'
     }
 
     buildTypes {
