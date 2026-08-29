@@ -65,29 +65,41 @@ jobs:
           print('Hamasho photo sprite restored to drawable and WebView assets')
           PY
 
-      - name: Restore exact Meieki Bettei launcher icon
+      - name: Restore full adaptive Meieki Bettei launcher icon
         run: |
-          mkdir -p app/src/main/res/mipmap-xxxhdpi
-          cat ci/icon_v1011_part1.txt \
-              ci/icon_v1011_part2.txt \
-              ci/icon_v1011_part3.txt \
-              ci/icon_v1011_part4.txt \
-            | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
-          echo "19fbd696f690b101136d932e7c44d52c9dc63c6139dbfeb443f4605594ef4bbe  app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" | sha256sum -c -
+          mkdir -p app/src/main/res/drawable-nodpi app/src/main/res/mipmap-xxxhdpi
+          cat ci/icon_v1012_part1.txt \
+              ci/icon_v1012_part2.txt \
+              ci/icon_v1012_part3.txt \
+              ci/icon_v1012_part4.txt \
+              ci/icon_v1012_part5.txt \
+              ci/icon_v1012_part6.txt \
+              ci/icon_v1012_part7.txt \
+              ci/icon_v1012_part8.txt \
+            | base64 -d > /tmp/ic_launcher_v1012.webp
+
+          echo "c0931456f1be60d3ab209f2894a9d55c78733a8e4ab52b7a5d73107d5956dd87  /tmp/ic_launcher_v1012.webp" | sha256sum -c -
+          cp /tmp/ic_launcher_v1012.webp app/src/main/res/drawable-nodpi/ic_launcher_art.webp
+          cp /tmp/ic_launcher_v1012.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
+
           python3 - <<'PY'
           from PIL import Image
-          p='app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp'
-          with Image.open(p) as im:
-              assert im.size == (192, 192), im.size
-              assert im.format == 'WEBP', im.format
-              im.verify()
-          print('Exact round Meieki Bettei launcher icon restored and verified')
+          for p in [
+              '/tmp/ic_launcher_v1012.webp',
+              'app/src/main/res/drawable-nodpi/ic_launcher_art.webp',
+              'app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp'
+          ]:
+              with Image.open(p) as im:
+                  assert im.size == (256, 256), (p, im.size)
+                  assert im.format == 'WEBP', (p, im.format)
+                  im.verify()
+          print('Full adaptive launcher art restored and verified')
           PY
 
       - name: Build debug APK with persistent signing home
         run: ANDROID_USER_HOME="$GITHUB_WORKSPACE/.android" gradle :app:assembleDebug --stacktrace
 
-      - name: Verify app assets and launcher icon inside APK
+      - name: Verify app assets and adaptive launcher icon inside APK
         run: |
           APK=app/build/outputs/apk/debug/app-debug.apk
           unzip -p "$APK" assets/home_sprite_v09.jpg > /tmp/apk_home_sprite.jpg
@@ -101,21 +113,24 @@ jobs:
           grep -q "季節のおすすめ" /tmp/apk_index.html
           grep -q "濱匠" /tmp/apk_index.html
 
-          ICON_PATH="$(unzip -Z1 "$APK" | grep -E '^res/.*/ic_launcher\.webp$' | head -n 1)"
-          test -n "$ICON_PATH"
-          unzip -p "$APK" "$ICON_PATH" > /tmp/apk_ic_launcher.webp
-          echo "19fbd696f690b101136d932e7c44d52c9dc63c6139dbfeb443f4605594ef4bbe  /tmp/apk_ic_launcher.webp" | sha256sum -c -
+          ART_PATH="$(unzip -Z1 "$APK" | grep -E '^res/.*/ic_launcher_art\.webp$' | head -n 1)"
+          test -n "$ART_PATH"
+          unzip -p "$APK" "$ART_PATH" > /tmp/apk_ic_launcher_art.webp
+          echo "c0931456f1be60d3ab209f2894a9d55c78733a8e4ab52b7a5d73107d5956dd87  /tmp/apk_ic_launcher_art.webp" | sha256sum -c -
+
+          unzip -Z1 "$APK" | grep -q 'ic_launcher'
+          unzip -Z1 "$APK" | grep -q 'ic_launcher_round'
 
           python3 - <<'PY'
           from PIL import Image
           with Image.open('/tmp/apk_home_sprite.jpg') as im:
               assert im.size == (800, 940)
               im.verify()
-          with Image.open('/tmp/apk_ic_launcher.webp') as im:
-              assert im.size == (192, 192), im.size
+          with Image.open('/tmp/apk_ic_launcher_art.webp') as im:
+              assert im.size == (256, 256), im.size
               assert im.format == 'WEBP', im.format
               im.verify()
-          print('APK photos, logo, HTML and exact launcher icon verified')
+          print('APK photos, logo, HTML and adaptive launcher art verified')
           PY
 
       - name: Upload APK
