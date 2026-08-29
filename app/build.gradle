@@ -10,8 +10,8 @@ android {
         applicationId 'jp.hamasho.bettei'
         minSdk 26
         targetSdk 35
-        versionCode 26
-        versionName '1.0.11-meieki-bettei-icon-fixed'
+        versionCode 27
+        versionName '1.0.12-adaptive-full-icon'
     }
 
     buildTypes {
